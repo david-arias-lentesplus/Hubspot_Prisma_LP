@@ -53,11 +53,53 @@ function slugify(text = "") {
 export async function exportNodeToPdf(node, { html2canvas, JsPDF }, { title = "informe", backgroundColor = "#FFFFFF" } = {}) {
   if (!node) throw new Error("exportNodeToPdf: no se recibió un nodo del DOM para capturar.");
 
-  const canvas = await html2canvas(node, {
-    backgroundColor,
-    scale: 2, // resolución más nítida que 1:1, sin llegar al costo de scale:3+
-    useCORS: true,
-  });
+  // --- FIX "PDF cortado" (2026-07-09) ------------------------------
+  // `node` es el <main> del layout, que desde el ajuste de "sidebar fijo
+  // al viewport" tiene `overflow-y: auto` + una altura acotada al alto
+  // disponible de pantalla (para que solo el contenido scrollee, sin
+  // arrastrar el sidebar/header). Si se captura tal cual, html2canvas
+  // solo "ve" la porción visible en el momento del click — todo lo que
+  // hacía falta scrollear para ver quedaba fuera del PDF.
+  //
+  // Fix (patrón estándar para exportar contenedores con scroll interno a
+  // imagen/PDF): antes de capturar, se fuerza temporalmente `overflow:
+  // visible` + `height: auto` sobre el nodo, dejando que su contenido se
+  // extienda a su alto real (`scrollHeight`), y se espera un frame para
+  // que el navegador recalcule el layout antes de que html2canvas lea
+  // las dimensiones. Apenas termina la captura (bloque `finally`), se
+  // restauran los estilos originales — el usuario como mucho ve un
+  // parpadeo de un frame y nunca pierde su posición de scroll.
+  const originalStyle = {
+    overflow: node.style.overflow,
+    overflowY: node.style.overflowY,
+    height: node.style.height,
+    maxHeight: node.style.maxHeight,
+  };
+
+  node.style.overflow = "visible";
+  node.style.overflowY = "visible";
+  node.style.height = "auto";
+  node.style.maxHeight = "none";
+
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  let canvas;
+  try {
+    canvas = await html2canvas(node, {
+      backgroundColor,
+      scale: 2, // resolución más nítida que 1:1, sin llegar al costo de scale:3+
+      useCORS: true,
+      windowHeight: node.scrollHeight,
+      height: node.scrollHeight,
+    });
+  } finally {
+    // Se restaura SIEMPRE, incluso si html2canvas lanza un error, para
+    // no dejar el layout roto en pantalla.
+    node.style.overflow = originalStyle.overflow;
+    node.style.overflowY = originalStyle.overflowY;
+    node.style.height = originalStyle.height;
+    node.style.maxHeight = originalStyle.maxHeight;
+  }
 
   const imgData = canvas.toDataURL("image/png");
   const pdf = new JsPDF({ orientation: "portrait", unit: "pt", format: "a4" });

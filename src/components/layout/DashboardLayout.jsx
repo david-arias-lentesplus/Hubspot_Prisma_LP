@@ -174,7 +174,15 @@ export default function DashboardLayout({
     setExportError(null);
     try {
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
-      await exportNodeToPdf(mainRef.current, { html2canvas, JsPDF: jsPDF }, { title });
+      // El fondo del PDF sigue el tema activo en pantalla (antes siempre
+      // era blanco fijo, lo que en modo oscuro podía dejar texto claro
+      // sobre fondo blanco en las zonas sin bg propio) — mismo criterio
+      // de "el PDF debe verse igual que la pantalla" pedido por David.
+      await exportNodeToPdf(
+        mainRef.current,
+        { html2canvas, JsPDF: jsPDF },
+        { title, backgroundColor: isDark ? "#0B0B0F" : "#FFFFFF" }
+      );
     } catch (err) {
       console.error("No se pudo exportar el informe a PDF:", err);
       setExportError("No se pudo generar el PDF. Intenta de nuevo.");
