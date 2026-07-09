@@ -11,10 +11,17 @@
  *
  * FILAS CLICKEABLES (2026-07-09): cada fila invoca `onSelectCampaign(row)`
  * al hacer click, que `App.jsx` usa para mostrar `CampaignDetailView`
- * (KPIs completos + análisis comparativo + iframe de vista previa del
- * correo, usando el campo `previewUrl` de dataService.js).
+ * (embudo de conversión + análisis comparativo + tarjeta de vista previa,
+ * ver CampaignDetailView.jsx).
+ *
+ * TOOLTIPS DE VALOR ABSOLUTO (2026-07-09): cada celda de % (Apertura/
+ * Clics/Rebote) muestra al hacer hover el conteo absoluto detrás de esa
+ * tasa (ej. "3,095 aperturas de 20,413 entregados"), vía `Tooltip.jsx`
+ * (CSS puro, sin librerías).
  * ------------------------------------------------------------------
  */
+
+import Tooltip from "../common/Tooltip";
 
 const COUNTRY_LABELS = { MX: "MX", CO: "CO", CL: "CL", AR: "AR", OTHER: "Otros" };
 
@@ -98,11 +105,27 @@ export default function CampaignsView({ data = [], loading = false, error = null
                   <td className="px-2 py-3 text-right font-mono text-[#111]">
                     {row.sentCount.toLocaleString("es-MX")}
                   </td>
-                  <td className="px-2 py-3 text-right font-mono text-[#666]">{row.openRate.toFixed(1)}%</td>
-                  <td className="px-2 py-3 text-right font-mono font-bold text-black">
-                    {row.clickRate.toFixed(1)}%
+                  <td className="px-2 py-3 text-right font-mono text-[#666]">
+                    <Tooltip
+                      label={`${row.opensCount.toLocaleString("es-MX")} aperturas de ${row.deliveredCount.toLocaleString("es-MX")} entregados`}
+                    >
+                      {row.openRate.toFixed(1)}%
+                    </Tooltip>
                   </td>
-                  <td className="px-2 py-3 text-right font-mono text-[#666]">{row.bounceRate.toFixed(1)}%</td>
+                  <td className="px-2 py-3 text-right font-mono font-bold text-black">
+                    <Tooltip
+                      label={`${row.clicksCount.toLocaleString("es-MX")} clics de ${row.deliveredCount.toLocaleString("es-MX")} entregados`}
+                    >
+                      {row.clickRate.toFixed(1)}%
+                    </Tooltip>
+                  </td>
+                  <td className="px-2 py-3 text-right font-mono text-[#666]">
+                    <Tooltip
+                      label={`${row.bounceCount.toLocaleString("es-MX")} rebotes de ${row.sentCount.toLocaleString("es-MX")} enviados`}
+                    >
+                      {row.bounceRate.toFixed(1)}%
+                    </Tooltip>
+                  </td>
                 </tr>
               ))}
             </tbody>

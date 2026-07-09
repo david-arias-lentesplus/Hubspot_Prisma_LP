@@ -10,7 +10,11 @@
  * filtrado (país / rango de fechas) que le pasa el padre — típicamente
  * el resultado de `filterByCountry` + `filterByDateRange` de
  * `useHubspotData` — y renderiza:
- *   1. LineChart:  Tasa de apertura vs. Tasa de clics en el tiempo
+ *   1. LineChart:  Tasa de apertura vs. Tasa de clics en el tiempo, con
+ *      toggle de granularidad Día/Semana/Mes (2026-07-09) — el estado del
+ *      toggle es puramente de presentación y vive en este componente, no
+ *      en App.jsx: no filtra el dataset, solo cambia cómo se agrupan los
+ *      mismos puntos (`buildTrendSeries(data, granularity)`).
  *   2. BarChart:   Enviados vs. Abiertos por país
  *   3. Tabla:      Top 5 campañas por tasa de clics
  *
@@ -18,6 +22,7 @@
  * ------------------------------------------------------------------
  */
 
+import { useState } from "react";
 import {
   LineChart,
   Line,
@@ -30,12 +35,21 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { buildTrendSeries, buildCountryVolume, getTopCampaigns, COUNTRY_LABELS } from "../../utils/reportAggregations";
+import {
+  buildTrendSeries,
+  buildCountryVolume,
+  getTopCampaigns,
+  COUNTRY_LABELS,
+  TREND_GRANULARITY_OPTIONS,
+} from "../../utils/reportAggregations";
 
-function ChartCard({ title, children, className = "" }) {
+function ChartCard({ title, headerExtra, children, className = "" }) {
   return (
     <div className={`bg-white rounded-card p-6 border border-livo-gray shadow-sm ${className}`}>
-      <h3 className="font-display font-bold text-lg text-black mb-4">{title}</h3>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h3 className="font-display font-bold text-lg text-black">{title}</h3>
+        {headerExtra}
+      </div>
       {children}
     </div>
   );
@@ -45,9 +59,50 @@ function EmptyState({ message }) {
   return <div className="h-72 flex items-center justify-center text-sm text-[#AAA]">{message}</div>;
 }
 
-function formatDateTick(value) {
+/**
+ * Toggle tipo "pill" (Día/Semana/Mes) para la granularidad del LineChart de
+ * tendencia. Componente puro de presentación: recibe el valor activo y
+ * reporta el cambio al padre, sin lógica propia de agregación.
+ */
+function GranularityToggle({ value, onChange }) {
+  return (
+    <div className="inline-flex p-1 bg-livo-gray/60 rounded-btn shrink-0" role="group" aria-label="Agrupar tendencia por">
+      {TREND_GRANULARITY_OPTIONS.map((opt) => {
+        const active = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            aria-pressed={active}
+            className={[
+              "px-3 py-1.5 rounded-btn text-xs font-bold tracking-[0.5px] transition-colors",
+              active ? "bg-livo-blue-500 text-white shadow-sm" : "text-[#666] hover:text-[#111]",
+            ].join(" ")}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Formatea la etiqueta del eje X del LineChart de tendencia según la
+ * granularidad activa: día ("08 jul"), semana ("Sem. 08 jul" — el lunes de
+ * esa semana) o mes ("julio 2026").
+ */
+function formatDateTick(value, granularity = "day") {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
+
+  if (granularity === "month") {
+    return parsed.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+  }
+  if (granularity === "week") {
+    return `Sem. ${parsed.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}`;
+  }
   return parsed.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
 }
 
@@ -70,6 +125,11 @@ function LoadingSkeleton() {
  * @param {string|null} [props.error]
  */
 export default function ReportsView({ data = [], loading = false, error = null }) {
+  // Granularidad del LineChart de tendencia (2026-07-09) — solo cambia cómo
+  // se agrupan los mismos puntos, no filtra `data`. Ver nota junto a
+  // ChartCard/GranularityToggle más arriba.
+  const [granularity, setGranularity] = useState("day");
+
   if (error) {
     return (
       <div className="bg-[#FFF5F5] border border-[#DC2626]/30 rounded-card p-6 text-sm text-[#B91C1C]">
@@ -80,23 +140,27 @@ export default function ReportsView({ data = [], loading = false, error = null }
 
   if (loading) return <LoadingSkeleton />;
 
-  const trendSeries = buildTrendSeries(data);
+  const trendSeries = buildTrendSeries(data, granularity);
   const countryVolume = buildCountryVolume(data);
   const topCampaigns = getTopCampaigns(data, 5);
+  const tickFormatter = (value) => formatDateTick(value, granularity);
 
   return (
     <div className="grid grid-cols-1 gap-6">
       {/* --- 1. Tendencia en el tiempo --- */}
-      <ChartCard title="Tendencia de apertura y clics">
+      <ChartCard
+        title="Tendencia de apertura y clics"
+        headerExtra={<GranularityToggle value={granularity} onChange={setGranularity} />}
+      >
         {trendSeries.length === 0 ? (
           <EmptyState message="No hay datos suficientes para graficar la tendencia." />
         ) : (
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={trendSeries} margin={{ top: 4, right: 12, left: -8, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" />
-              <XAxis dataKey="date" tickFormatter={formatDateTick} tick={{ fontSize: 12, fill: "#666" }} />
+              <XAxis dataKey="date" tickFormatter={tickFormatter} tick={{ fontSize: 12, fill: "#666" }} />
               <YAxis tick={{ fontSize: 12, fill: "#666" }} unit="%" />
-              <Tooltip labelFormatter={formatDateTick} formatter={(value) => [`${value}%`]} />
+              <Tooltip labelFormatter={tickFormatter} formatter={(value) => [`${value}%`]} />
               <Legend wrapperStyle={{ fontSize: 13 }} />
               <Line
                 type="monotone"

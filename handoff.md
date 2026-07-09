@@ -1,7 +1,7 @@
 # HANDOFF — Dashboard de HubSpot (Lentesplus)
 
 > Fuente de la verdad del proyecto. Se actualiza cada vez que se hace un cambio importante en la arquitectura, se agrega una nueva librería, o se resuelve un bug complejo ("Actualiza el handoff").
-> Owner: David · Última actualización: 2026-07-09 (popover de fechas compactado; detalle de campaña clickeable con iframe de vista previa; Configuración con nombre/link de la hoja de cálculo)
+> Owner: David · Última actualización: 2026-07-09 (analítica avanzada: Insight del Asunto, Salud del dominio, Mejor horario de envío; embudo de conversión reemplaza las tarjetas de KPI de campaña; iframe de vista previa eliminado — reemplazado por tarjeta + botón a HubSpot; toggle Día/Semana/Mes en tendencia; tooltips de valor absoluto en tablas)
 
 ---
 
@@ -60,29 +60,36 @@ mails hubspot lentesplus/
     ├── App.jsx                           # NUEVO — página contenedora: ensambla layout+filtros+summary+reportes
     ├── index.css                         # NUEVO — directivas @tailwind base/components/utilities
     ├── services/
-    │   └── dataService.js               # fetch + PapaParse + normalización + país + campaignId/previewUrl/subject
+    │   └── dataService.js               # fetch + PapaParse + normalización + país + campaignId/previewUrl/subject/previewText/hasEmoji + tasas de deliverability
     ├── hooks/
-    │   └── useHubspotData.js            # data, loading, error, filtros, KPIs globales
+    │   ├── useHubspotData.js            # data, loading, error, filtros, KPIs globales
+    │   └── useAdvancedAnalytics.js      # NUEVO — memoiza buildEmojiInsight/buildDeliverabilityHealth/buildBestSendTime sobre el dataset filtrado
     ├── utils/
-    │   ├── reportAggregations.js        # agregaciones puras: tendencia, país (volumen), país (métricas), top 5, insights de campaña
+    │   ├── reportAggregations.js        # agregaciones puras: tendencia (con granularidad día/semana/mes), país (volumen), país (métricas + sumas absolutas), top 5, insights de campaña
+    │   ├── advancedAnalytics.js         # NUEVO — funciones puras: buildEmojiInsight, buildDeliverabilityHealth (+ alertas), buildBestSendTime (+ heatmap)
     │   └── dateRangePresets.js          # cálculo de rangos (Ayer/7d/28d/90d/semana/mes/año/personalizado) + grilla de calendario
     └── components/
         ├── layout/
         │   └── DashboardLayout.jsx      # Sidebar (logo Prisma/Lentesplus) + área principal + navegación real
         ├── metrics/
         │   ├── MetricCard.jsx           # card de KPI (título/valor/crecimiento) — con hover:shadow-md
-        │   └── DashboardSummary.jsx     # grid de 4 MetricCard + estados loading/error
+        │   ├── DashboardSummary.jsx     # grid de 4 MetricCard + estados loading/error
+        │   └── ConversionFunnel.jsx     # NUEVO — embudo Enviados→Entregados→Aperturas→Clics, usado en CampaignDetailView
+        ├── common/
+        │   └── Tooltip.jsx              # NUEVO — tooltip reutilizable 100% CSS (Tailwind group-hover), sin librerías
+        ├── insights/
+        │   └── AdvancedInsights.jsx     # NUEVO — compone Insight del Asunto + Salud del dominio + Mejor horario, vista "Resumen"
         ├── filters/
         │   ├── FiltersBar.jsx           # barra superior de filtros (país + tipo de envío + rango de fechas)
         │   ├── DateRangeFilter.jsx      # popover de fechas estilo Google Analytics (presets + calendario 2 meses, tamaño compactado 2026-07-09)
         │   └── Filters.jsx              # ⚠️ LEGACY — sustituido por FiltersBar.jsx (ver sección 8)
         ├── reports/
-        │   └── ReportsView.jsx          # vista "Resumen": LineChart + BarChart (recharts) + tabla Top 5
+        │   └── ReportsView.jsx          # vista "Resumen": LineChart (con toggle Día/Semana/Mes) + BarChart (recharts) + tabla Top 5
         ├── campaigns/
-        │   ├── CampaignsView.jsx        # vista "Campañas": tabla completa del dataset filtrado, filas clickeables (2026-07-09)
-        │   └── CampaignDetailView.jsx   # NUEVO (2026-07-09) — detalle de 1 campaña: KPIs, análisis comparativo vs. pares, iframe de vista previa
+        │   ├── CampaignsView.jsx        # vista "Campañas": tabla completa del dataset filtrado, filas clickeables, tooltips de valor absoluto
+        │   └── CampaignDetailView.jsx   # detalle de 1 campaña: ConversionFunnel + análisis comparativo vs. pares + tarjeta de vista previa (SIN iframe, ver sección 4)
         ├── countries/
-        │   └── CountriesView.jsx        # vista "Países": tarjetas + tabla comparativa por país
+        │   └── CountriesView.jsx        # vista "Países": tarjetas + tabla comparativa por país, tooltips de valor absoluto
         └── settings/
             └── SettingsView.jsx         # vista "Configuración": nombre/URL de la hoja + link a Google Sheets (todo solo lectura) + botón "Refrescar"
 ```
@@ -151,6 +158,24 @@ mails hubspot lentesplus/
 - [x] `SettingsView.jsx` — agregado "Nombre de la hoja de cálculo" (`"BD Emails Hubspot"`), la URL del CSV y la URL de la hoja de Google Sheets ahora se muestran en inputs `disabled` (no editables), botón "Abrir hoja" (`target="_blank"`) hacia `https://docs.google.com/spreadsheets/d/1ujjNuu8V4po-mFheWYR9nwyb-1wOXmHxh-vVv88fyEk/edit?usp=sharing`, badge "Solo lectura" y nota explícita de que ningún campo de la página es editable
 - [x] Verificado en el navegador real (Claude in Chrome): popover de fechas ya no desborda la pantalla; click en una fila de Campañas abre el detalle con KPIs y análisis correctos; Configuración muestra el nombre de la hoja, ambas URLs deshabilitadas y el link "Abrir hoja" — ver sección 4 para el hallazgo sobre el iframe de vista previa
 
+**Investigación: reconstruir la URL pública ("versión web") del correo (2026-07-09) — DESCARTADA, ver sección 4:**
+- [x] David propuso usar la URL pública de `info.lentesplus.com` (sin login, a diferencia de `preview.hs-sites.com`) en vez de `previewUrl`. Se investigó si su estructura es reconstruible desde las columnas del CSV — conclusión: NO de forma confiable. Detalle completo del hallazgo y por qué en sección 4. No se tocó código por esto — `previewUrl` (`preview.hs-sites.com`) se mantiene como está.
+
+**Analítica avanzada + Embudo de conversión + Fix del preview + Tooltips (2026-07-09):**
+
+Ronda grande de trabajo pedida explícitamente por David, dividida por rol (Agente de Datos / Agente UI/UX):
+
+- [x] **Agente de Datos — `dataService.js`**: nuevos campos normalizados por fila: `previewText` (`"Línea del asunto y clasificación del texto de vista previa"`), `hasEmoji` (boolean, regex Unicode sobre `subject`), `hardBounceCount`/`softBounceCount` (`"Rebote duro"`/`"Rebote suave"`) y sus tasas `hardBounceRate`/`softBounceRate`/`spamRate`/`unsubscribeRate` — todas calculadas con `safeRate()` desde conteos crudos, **nunca** desde columnas de tasa precalculadas de HubSpot (mismo criterio que `openRate`/`clickRate`/`bounceRate`, ver sección 4).
+- [x] **Agente de Datos — `src/utils/advancedAnalytics.js`** (nuevo archivo): `buildEmojiInsight(data)` (compara `openRate` promedio de campañas con/sin emoji en el asunto), `buildDeliverabilityHealth(data)` (promedia las 4 tasas de deliverability + genera alertas si `spamRate > 0.1%` o `hardBounceRate > 2%`, umbrales pedidos explícitamente), `buildBestSendTime(data)` (agrupa por día de semana × hora de envío, devuelve celdas con datos para un mapa de calor + la mejor combinación día/hora, con mínimo de 2 muestras antes de recomendarla — si no alcanza ese mínimo, cae a la mejor celda disponible marcada con `usedFallback: true`).
+- [x] **Agente de Datos — `src/hooks/useAdvancedAnalytics.js`** (nuevo archivo): memoiza las 3 funciones de arriba sobre el dataset ya filtrado, mismo contrato que `useHubspotData.js`.
+- [x] **Agente de Datos — `reportAggregations.js`**: `buildTrendSeries(data, granularity)` ahora acepta `"day"|"week"|"month"` (bucket por lunes de la semana / día 1 del mes, conversión local-safe sin `toISOString()`); `buildCountryMetrics()` ahora también suma los valores absolutos (`totalDelivered`/`totalOpens`/`totalClicks`/`totalBounces`) para los tooltips de país.
+- [x] **Agente UI/UX — Fix del Preview (Opción A)**: se **eliminó por completo el iframe** de `CampaignDetailView.jsx` (bloqueado por HubSpot — ver sección 4). Se reemplazó por una tarjeta con `subject` + `previewText` y un botón primario grande "Ver diseño original en HubSpot" (`target="_blank"` hacia `previewUrl`).
+- [x] **Agente UI/UX — `ConversionFunnel.jsx`** (nuevo componente): reemplaza la grilla de 5 `MetricCard` del detalle de campaña por un embudo visual Enviados→Entregados→Aperturas→Clics (barras proporcionales al primer paso, tonos `livo-blue` 500→400→300→200, % de conversión contra el paso anterior y contra el total). Las tasas de apertura/clics/rebote se conservan en una fila compacta debajo del embudo; el detalle narrativo vs. pares sigue en "Análisis".
+- [x] **Agente UI/UX — Toggle Día/Semana/Mes**: `ReportsView.jsx` agrega un toggle tipo "pill" sobre el `LineChart` de tendencia (estado local del componente, no filtra `data` — solo cambia cómo se agrupan los mismos puntos vía `buildTrendSeries(data, granularity)`).
+- [x] **Agente UI/UX — `Tooltip.jsx`** (nuevo componente, común): tooltip 100% CSS (`group`/`group-hover` de Tailwind), sin Radix UI ni Headless UI — decisión explícita de David ("se prefiere CSS puro con Tailwind group-hover si es posible"). Aplicado en `CampaignsView.jsx` (celdas de Apertura/Clics/Rebote) y `CountriesView.jsx` (tarjetas + tabla comparativa), mostrando el valor absoluto detrás de cada % (ej. "3,095 aperturas de 20,413 entregados"). Fuera de alcance explícito de este pedido: la tabla "Top 5" de `ReportsView.jsx` no lleva tooltips todavía (el pedido especificaba "las tablas (Campañas y Comparativo por país)").
+- [x] **Agente UI/UX — `AdvancedInsights.jsx`** (nuevo componente): compone las 3 tarjetas de analítica avanzada y se monta en la vista "Resumen", debajo de `ReportsView`. Incluye un mapa de calor básico (7 días × 24 horas, opacidad de `livo-blue-500` proporcional a la tasa de apertura de cada celda) para "Mejor horario de envío".
+- [x] Verificado en el navegador real (Claude in Chrome): toggle Día/Semana/Mes cambia la gráfica correctamente en los 3 modos; detalle de campaña muestra el embudo con barras y % correctos y la tarjeta de preview sin iframe (incluido el campo `previewText`, confirmado mostrando "Question Format" tal como viene en el CSV crudo); tooltips muestran el valor absoluto correcto en Campañas y Países; las 3 tarjetas de analítica avanzada renderizan con datos reales (incluida al menos una alerta/estado "sin alertas" de Salud del dominio). Nota: el bug del badge de "Tasa de rebote" en `MetricCard` (fila de la sección 4) quedó automáticamente resuelto de raíz al quitar la grilla de `MetricCard` del detalle de campaña — `MetricCard` ya no se usa en `CampaignDetailView.jsx`.
+
 ### Falta
 
 - [ ] Estados visuales `LoadingState` / `ErrorState` genéricos y reutilizables (hoy cada componente nuevo implementa su propio skeleton/error inline; conviene extraerlos)
@@ -159,7 +184,11 @@ mails hubspot lentesplus/
 - [ ] Tests para servicios de datos y agregaciones (parseo, filtros, cálculo de KPIs, `reportAggregations.js`, `dateRangePresets.js`)
 - [ ] Code-splitting / `manualChunks` — Vite advierte que el bundle JS (~586 kB) supera los 500 kB recomendados; no bloquea el desarrollo pero conviene revisarlo antes de producción
 - [ ] `DateRangeFilter.jsx`: el popover en mobile podría afinarse más (hoy se ve pero es angosto con 2 meses lado a lado en pantallas muy chicas); considerar mostrar 1 solo mes en `sm` como ya hace parcialmente
-- [ ] `CampaignDetailView.jsx`: el iframe de vista previa puede aparecer en blanco para algunas campañas por la restricción de cookies de terceros del navegador (ver sección 4) — hoy se mitiga con una nota visible + el link "Abrir en pestaña nueva", pero no hay una forma confiable de detectar el fallo en JS y mostrar el fallback automáticamente
+- [ ] **Mejorar la vista previa del correo con la URL pública real (`info.lentesplus.com`), no reconstruida** — la forma correcta de hacer esto es agregar la URL pública como columna del export de HubSpot (o vía su API con un backend), NO adivinándola desde el Asunto — ver sección 4 para por qué se descartó la reconstrucción. Con la Opción A ya implementada (tarjeta + botón, sin iframe) esto ya no es urgente, pero seguiría siendo una mejora si la URL se vuelve exportable.
+- [ ] Tests para `advancedAnalytics.js` (`buildEmojiInsight`, `buildDeliverabilityHealth`, `buildBestSendTime`) — mismo pendiente que el resto de la capa de datos, ver ítem de tests más abajo
+- [ ] Tooltips de valor absoluto (`Tooltip.jsx`) en la tabla "Top 5 campañas" de `ReportsView.jsx` — quedó fuera del alcance explícito del pedido ("las tablas (Campañas y Comparativo por país)"), pero sería consistente agregarlos ahí también
+- [ ] Mapa de calor de "Mejor horario de envío" (`AdvancedInsights.jsx`): es básico a propósito (celdas de 12px, sin zoom/interacción); si se vuelve un feature importante, vale la pena revisar una librería de heatmap dedicada o mejorar la accesibilidad (hoy el detalle de cada celda solo está en el atributo `title` nativo del navegador)
+- [ ] `buildBestSendTime()` no hace ninguna conversión de zona horaria — usa la hora tal cual viene en `"Fecha de envío (tu zona horaria)"` (ya la zona horaria configurada en HubSpot). Si en el futuro se necesita comparar entre países con zonas horarias distintas, esto habría que revisarlo.
 
 ---
 
@@ -178,6 +207,7 @@ mails hubspot lentesplus/
 | 2026-07-09 | Con la fuente de Sheets ya funcionando, los KPIs mostraban valores imposibles: "213.0%" de tasa de clics promedio y "488.7%" de tasa de rebote | Las columnas `"Tasa de clics"` y `"Tasa de rebote"` de HubSpot sufren el mismo bug de pérdida de punto decimal que `"Tasa de apertura"` (fila de arriba), pero como su escala natural es mucho más chica (tasas <2%), el valor corrompido cae **por debajo de 1000** (ej. `"0.147"` → `"147"`), rompiendo la regla ">=1000" de `parseRateValue()` que asumía que todo lo corrupto sería ≥1000. | Se eliminó `parseRateValue()` y la lectura de las columnas de texto de tasa por completo. `dataService.js` ahora calcula `openRate = Abierto/Entregado*100`, `clickRate = Con clic/Entregado*100`, `bounceRate = Rebotes/Enviado*100` directamente desde los conteos crudos (función `safeRate()`), que no muestran ningún problema de formato. Validado contra las 435 filas reales: diferencia máxima 0.0005 puntos porcentuales vs. el cálculo manual fila por fila. Esta arquitectura es inmune a futuras corrupciones de formato en las columnas de texto, porque ya no se leen. |
 | 2026-07-09 | El badge de variación en la card "Tasa de rebote" del detalle de campaña mostraba una flecha verde hacia arriba junto a un texto que decía "por debajo del promedio" — contradictorio a simple vista | `MetricCard` asume que "diferencia positiva = bueno = flecha verde arriba" (válido para apertura/clics). En rebote es al revés (menor = mejor), así que se invertía el signo antes de pasarlo (`-insights.bounceRateDiff`) para forzar el color correcto, pero eso invertía también la flecha, generando un ícono que visualmente decía "subió" sobre una métrica que en realidad bajó (bien). | Se quitó el badge de variación de la card de "Tasa de rebote" en `CampaignDetailView.jsx` — el contexto de si está por encima/debajo del promedio de pares ya se explica en texto en la sección "Análisis", sin depender del componente `MetricCard` (pensado para métricas donde "más alto" siempre es mejor). |
 | 2026-07-09 | El iframe de "Vista previa del correo" en `CampaignDetailView.jsx` aparecía en blanco (ícono de imagen rota) para todas las campañas probadas | Verificado con Claude in Chrome: el mismo `previewUrl` (`https://preview.hs-sites.com/_hcms/preview/content/...`) carga perfecto cuando se abre como pestaña propia (top-level), pero dentro del iframe la petición de red mostraba un redirect a `https://app.hubspot.com/content-tools-menu/api/v1/tools-menu/login-verify?...` que devolvía **503**. Causa: la página de vista previa de HubSpot necesita hacer una navegación de nivel superior para validar/setear la cookie de sesión de preview; los navegadores modernos bloquean esa validación cuando ocurre dentro de un iframe de terceros (restricción de cookies de terceros), y HubSpot no tiene un fallback para ese caso. | No es un bug de la app — es una limitación real de cómo HubSpot arma sus enlaces de vista previa. Se dejó el iframe (puede funcionar según el estado de cookies/sesión del navegador del usuario) más una nota visible arriba del recuadro explicando la limitación, y el link "Abrir en pestaña nueva" (que sí funciona siempre) se mantiene visible en todo momento como alternativa garantizada. Ver sección 3 "Falta" — no hay forma confiable de detectar el fallo en JS para ocultar el iframe automáticamente. |
+| 2026-07-09 | David propuso reemplazar `previewUrl` (que requiere login para el iframe, ver fila de arriba) por la URL pública "versión web" del correo (dominio propio `info.lentesplus.com`, sin login) — pasó primero 1 ejemplo real y luego, a pedido de la investigación, **12 ejemplos reales más** (3 grupos de 4 países: "Líquidos", "CajaFabricante", "Afecciones") para buscar el patrón del sufijo numérico del slug | Confirmado: `info.lentesplus.com` SÍ es apto para iframe (sin login, sin `X-Frame-Options`, CSP sin `frame-ancestors`) y el slug base sí se deriva de `"Asunto"` (minúsculas, sin `¿`/`?`/emoji, espacios→guiones). El problema sigue siendo el sufijo de desambiguación cuando el `"Asunto"` se repite entre países (el caso normal: incluso "Afecciones" comparte el mismo asunto en las 4 filas). Con los 12 ejemplos se probaron 3 hipótesis de orden (ID del correo de marketing asc., ID interno de HubSpot asc., fecha de publicación asc.) contra los grupos "Líquidos" y "CajaFabricante": **ninguna predice el orden real de sufijos en ambos grupos a la vez** — "ID de correo asc." acierta en "Líquidos" (CO=ninguno, CL=`-1`, MX=`-2`) pero falla en "CajaFabricante" (predice MX/CL/CO, la realidad es CO/CL/MX — orden invertido); las otras dos hipótesis fallan en los dos grupos. Evidencia adicional de que el sufijo depende del historial completo del dominio (no solo de estas filas): en "Afecciones", CO usa `cómoda-1` (con guion) y CL usa `cómoda1` (sin guion) — mismo número, formato distinto, señal de que HubSpot va probando variantes contra slugs ya existentes en todo el dominio; y el AR de "CajaFabricante" salió con sufijo `-23`, un número que un contador local de 4 filas nunca produciría. | **Se descartó definitivamente reconstruir/adivinar esta URL** — no es que falte encontrar la fórmula correcta, el dato (historial de slugs de todo el dominio) simplemente no existe en el CSV bajo ninguna combinación de columnas. Con asuntos repetidos (el caso común de esta cuenta), adivinar el sufijo no da un 404 limpio — puede **mostrar silenciosamente el correo equivocado de otro país**, peor que el iframe en blanco actual. No se tocó código: `previewUrl`/`CampaignDetailView.jsx` se dejaron como están. Caminos reales hacia adelante (ver sección 3 "Falta"): (1) revisar si el editor de columnas del reporte de HubSpot permite exportar la URL pública/"live URL" directamente — sin API key, sin backend, cambio de una línea en `dataService.js` si existe; (2) si no existe esa columna, consumir la API de Marketing Emails de HubSpot (requiere token de app privada → backend/proxy, fuera del alcance actual del proyecto por decisión de David de no usar API keys). |
 
 ---
 
@@ -192,11 +222,13 @@ mails hubspot lentesplus/
 | `papaparse` | Parseo del CSV de HubSpot a JSON |
 | `recharts` | Gráficos — **implementado** en `ReportsView.jsx` (`LineChart`, `BarChart`) desde 2026-07-09 |
 
+**Decisión explícita (2026-07-09): NO se agregó ninguna librería de tooltips.** El pedido de "tooltips de valores absolutos" en las tablas se evaluó contra Radix UI / Headless UI, pero se resolvió con `src/components/common/Tooltip.jsx` — CSS puro (Tailwind `group`/`group-hover`), cero dependencias nuevas, siguiendo la preferencia explícita de David ("se prefiere CSS puro con Tailwind group-hover si es posible"). Este archivo sigue teniendo exactamente las mismas 4 dependencias de producción desde que se hizo el scaffold formal.
+
 ---
 
 ## 5.1 ARQUITECTURA DEL ESTADO DE DATOS UNIFICADO
 
-Stack: **React (Hooks) + Tailwind CSS + PapaParse + Recharts**, sin librería de estado global (Redux/Zustand) — el estado vive en el árbol de componentes vía Hooks nativos. Flujo de datos de una sola vía (unidireccional):
+Stack: **React (Hooks) + Tailwind CSS + PapaParse + Recharts**, sin librería de estado global (Redux/Zustand) y sin librería de tooltips/overlays (Radix UI / Headless UI evaluadas y descartadas, ver sección 5) — el estado vive en el árbol de componentes vía Hooks nativos. Flujo de datos de una sola vía (unidireccional). Actualizado 2026-07-09 para incorporar el segundo hook de datos (`useAdvancedAnalytics`) que se sumó a `useHubspotData`:
 
 ```
 dataService.js (fetch + PapaParse + normalización)
@@ -204,33 +236,45 @@ dataService.js (fetch + PapaParse + normalización)
         ▼
 useHubspotData()  ← única fuente de verdad del dataset completo
         │  data, loading, error
-        │  filterByCountry(code, dataset?)
-        │  filterByDateRange(start, end, dataset?)
-        │  getGlobalMetrics(dataset?) / globalMetrics
+        │  filterByCountry(code, dataset?) · filterByType(type, dataset?) · filterByDateRange(start, end, dataset?)
+        │  getGlobalMetrics(dataset?) / globalMetrics · refetch() · lastFetchedAt
         ▼
-App.jsx (página contenedora — implementada 2026-07-09)
+App.jsx (página contenedora)
    ├── estado local: view ("resumen"|"campanas"|"paises"|"configuracion")
-   ├── estado local: country, datePreset, startDate, endDate
-   ├── dataset derivado = filterByCountry(filterByDateRange(data))
+   ├── estado local: selectedCampaignId (detalle de campaña dentro de "campanas")
+   ├── estado local: country, campaignType, datePreset, startDate, endDate
+   ├── filteredData = filterByType(filterByCountry(filterByDateRange(data)))
+   ├── selectedCampaign = data.find(campaignId)  ← sobre `data` completo, no filteredData (ver sección 3)
+   ├── advancedAnalytics = useAdvancedAnalytics(filteredData)  ← NUEVO (2026-07-09), memoizado sobre el mismo filteredData
    │
-   ├─▶ DashboardLayout   (activeItemId=view, onNavigate=setView) ← navegación real del sidebar
-   ├─▶ FiltersBar        (country, datePreset, startDate, endDate + callbacks onChange) — en resumen/campañas/países
-   ├─▶ view "resumen":       DashboardSummary (metrics = getGlobalMetrics(dataset derivado)) + ReportsView
-   ├─▶ view "campanas":      CampaignsView (data = dataset derivado)
-   ├─▶ view "paises":        CountriesView (data = dataset derivado)
-   └─▶ view "configuracion": SettingsView (csvUrl, rowCount, lastFetchedAt, onRefetch=refetch)
+   ├─▶ DashboardLayout   (activeItemId=view, onNavigate=handleNavigate) ← navegación real + limpia selectedCampaignId
+   ├─▶ FiltersBar        (country, campaignType, datePreset, startDate, endDate + callbacks) — en resumen/campañas/países
+   ├─▶ view "resumen":
+   │     ├─▶ DashboardSummary   (metrics = getGlobalMetrics(filteredData))
+   │     ├─▶ ReportsView        (data = filteredData) — granularidad día/semana/mes es estado LOCAL del componente
+   │     └─▶ AdvancedInsights   ({...advancedAnalytics}) — NUEVO, puramente presentación de lo que ya calculó el hook
+   ├─▶ view "campanas":
+   │     ├─▶ CampaignsView      (data = filteredData) — sin selectedCampaignId
+   │     └─▶ CampaignDetailView (campaign = selectedCampaign, dataset = filteredData) — con selectedCampaignId
+   ├─▶ view "paises":        CountriesView (data = filteredData)
+   └─▶ view "configuracion": SettingsView (csvUrl, sheetName, sheetUrl, rowCount, lastFetchedAt, onRefetch=refetch)
                 │
                 ▼
-        reportAggregations.js (agregación pura, sin estado)
-          buildTrendSeries · buildCountryVolume · buildCountryMetrics · getTopCampaigns
+        reportAggregations.js                              advancedAnalytics.js (NUEVO)
+          buildTrendSeries(data, granularity)                 buildEmojiInsight(data)
+          buildCountryVolume · buildCountryMetrics            buildDeliverabilityHealth(data)
+          getTopCampaigns · buildCampaignInsights              buildBestSendTime(data)
+        (agregación pura, sin estado — ambos archivos)
 ```
 
 Reglas clave:
 - **Ningún componente de UI hace `fetch` ni usa PapaParse directamente** — todo pasa por `dataService.js` → `useHubspotData.js`.
-- **Ningún componente de UI agrega datos "a mano"** para los charts/tablas — toda agregación (por fecha, por país, top N) vive en `reportAggregations.js`, funciones puras y testeables por separado.
-- Los filtros (país / rango de fechas) y la navegación (`view`) son **estado de `App.jsx`**, no de `useHubspotData` ni de `FiltersBar`/`DashboardLayout` — estos solo reportan cambios vía callbacks (`onCountryChange`, `onDatePresetChange`, `onNavigate`), siguiendo el patrón "componente controlado".
-- Todo componente que consume datos derivados (`DashboardSummary`, `ReportsView`, `CampaignsView`, `CountriesView`) acepta `loading` y `error` como props explícitas y maneja su propio estado visual (skeleton / mensaje de error / estado vacío) — no asume que el dataset siempre tiene filas.
-- Las tasas (`openRate`, `clickRate`, `bounceRate`) se calculan en `dataService.js` desde conteos crudos, nunca desde las columnas de texto de tasa de HubSpot (ver sección 4, última fila) — cualquier componente que las use ya las recibe correctas, no necesita re-validarlas.
+- **Ningún componente de UI agrega datos "a mano"** para los charts/tablas/insights — toda agregación (por fecha, por país, top N, insights avanzados) vive en `reportAggregations.js` / `advancedAnalytics.js`, funciones puras y testeables por separado.
+- `useAdvancedAnalytics` sigue el mismo contrato que `useHubspotData`: recibe el dataset como parámetro (no filtra, no hace fetch) y solo memoiza (`useMemo`) sobre las funciones puras — es un hook "de presentación de agregados", no una segunda fuente de verdad. Vive separado de `useHubspotData` a propósito: responde preguntas analíticas distintas (insights de contenido / salud del dominio / mejor horario) en vez de reportes descriptivos, y así ninguno de los dos hooks crece indefinidamente.
+- Los filtros (país / tipo de envío / rango de fechas) y la navegación (`view`, `selectedCampaignId`) son **estado de `App.jsx`**, no de `useHubspotData` ni de `FiltersBar`/`DashboardLayout`/`CampaignsView` — estos solo reportan cambios vía callbacks (`onCountryChange`, `onDatePresetChange`, `onNavigate`, `onSelectCampaign`), siguiendo el patrón "componente controlado".
+- Excepción deliberada: la granularidad del `LineChart` de tendencia (Día/Semana/Mes) es estado **local** de `ReportsView.jsx`, no de `App.jsx` — no filtra `data`, solo cambia cómo se agrupan los mismos puntos, así que no necesita vivir "arriba" en el árbol.
+- Todo componente que consume datos derivados (`DashboardSummary`, `ReportsView`, `AdvancedInsights`, `CampaignsView`, `CountriesView`) acepta `loading` y `error` como props explícitas y maneja su propio estado visual (skeleton / mensaje de error / estado vacío) — no asume que el dataset siempre tiene filas.
+- Las tasas (`openRate`, `clickRate`, `bounceRate`, y desde 2026-07-09 también `hardBounceRate`/`softBounceRate`/`spamRate`/`unsubscribeRate`) se calculan en `dataService.js` desde conteos crudos, nunca desde las columnas de texto de tasa de HubSpot (ver sección 4) — cualquier componente/hook que las use ya las recibe correctas, no necesita re-validarlas.
 
 ---
 
@@ -261,6 +305,19 @@ Detalle completo en `DESIGN_SYSTEM-LIVO.md`.
 
 **Nota de accesibilidad aplicada:** se evitó deliberadamente usar Lime (`#DEFF00`) como color de línea/barra sobre fondo blanco de los charts, siguiendo la regla explícita de la sección 14 ("Never use Lime on white — insufficient contrast"). Si se necesita un tercer color de serie en el futuro (p. ej. tasa de rebote en el mismo `LineChart`), usar Pink (`#D92D8E`) o un tono de Blue más oscuro (`blue-700` `#00009D`) antes que Lime.
 
+**Ampliación 2026-07-09 — `ConversionFunnel.jsx` y `AdvancedInsights.jsx`:** ningún color nuevo, solo tokens ya existentes en `tailwind.config.js`, usados vía clases de Tailwind (no hex directo, a diferencia de Recharts arriba, porque estos sí son elementos DOM normales):
+
+| Elemento | Clase Tailwind | Token / semántica |
+|---|---|---|
+| `ConversionFunnel` — barra "Enviados" | `bg-livo-blue-500` + `text-white` | Electric Blue base — primer paso del embudo |
+| `ConversionFunnel` — barra "Entregados" | `bg-livo-blue-400` + `text-white` | Blue más claro — degradado del embudo, mismo tono |
+| `ConversionFunnel` — barra "Aperturas" | `bg-livo-blue-300` + `text-livo-blue-900` | Blue claro — texto oscuro por contraste (fondo claro) |
+| `ConversionFunnel` — barra "Clics" | `bg-livo-blue-200` + `text-livo-blue-900` | Blue muy claro — mismo criterio de contraste |
+| Heatmap "Mejor horario de envío" | `bg-livo-blue-500` con `opacity` inline (0.06–1) | Un solo tono de Blue, intensidad = tasa de apertura relativa — evita la ambigüedad de usar 2 colores (rojo/verde) para una métrica donde no hay "bueno/malo" binario |
+| Alertas de "Salud del dominio" (rojo) | `bg-[#FFF5F5] border-[#DC2626]/30 text-[#B91C1C]` | Reutiliza el mismo semantic-red ya usado en los estados de error de `CampaignsView.jsx`/`CountriesView.jsx`/`ReportsView.jsx` — no es un color nuevo |
+| Estado "sin alertas" (verde) | `bg-[#DCFCE7] text-[#15803D]` | Reutiliza el mismo semantic-green ya usado en `MetricCard.jsx` para variación positiva |
+| `Tooltip.jsx` (fondo del globo) | `bg-[#111]` + `text-white` + `shadow-tooltip` | Neutral oscuro — patrón estándar de tooltip (no forma parte de la paleta de marca a propósito, igual que en la mayoría de sistemas de diseño); usa el token `shadow-tooltip` que ya existía en `tailwind.config.js` desde el scaffold inicial, pensado justamente para este caso |
+
 ### 6.2 Rebrand LIVO → Prisma (2026-07-09)
 
 Se cambió el nombre de marca visible en la UI de "LIVO" a **"Prisma"**, a pedido de David. Alcance del cambio — **solo texto/branding visible**, nada estructural:
@@ -283,6 +340,22 @@ Clasificación (`getCampaignTypeFromName()` en `dataService.js`, ver sección 1.
 
 Verificado en el navegador real: al filtrar por "Flujo de trabajo" la tabla de Campañas pasa de 436 a 220 filas (158 + 62, coincide exactamente).
 
+### 6.4 Componentes de UI — mapeo de esta iteración (2026-07-09)
+
+| Componente | Tipo | Dónde se usa | Reemplaza / se agrega a |
+|---|---|---|---|
+| `ConversionFunnel.jsx` | Nuevo | `CampaignDetailView.jsx` | Reemplaza la grilla de 5 `MetricCard` del detalle de campaña |
+| `Tooltip.jsx` | Nuevo (común) | `CampaignsView.jsx`, `CountriesView.jsx` | Se agrega — no reemplaza nada |
+| `AdvancedInsights.jsx` | Nuevo | Vista "Resumen" (`App.jsx`), debajo de `ReportsView` | Se agrega — no reemplaza nada |
+| `GranularityToggle` (subcomponente interno) | Nuevo | Dentro de `ReportsView.jsx` (no es archivo aparte) | Se agrega sobre el `LineChart` de tendencia existente |
+| `MetricCard.jsx` | Existente, sin cambios | `DashboardSummary.jsx` (Resumen) | Ya NO se usa en `CampaignDetailView.jsx` (ver arriba) |
+| `CampaignDetailView.jsx` | Modificado | Vista "Campañas" (detalle) | Se quitó el `<iframe>`; se agregó tarjeta de preview + `ConversionFunnel` |
+| `ReportsView.jsx` | Modificado | Vista "Resumen" | `ChartCard` ahora acepta `headerExtra` (usado para el toggle) |
+| `CampaignsView.jsx` / `CountriesView.jsx` | Modificados | Vistas "Campañas" / "Países" | Celdas de % envueltas en `<Tooltip>` |
+| `reportAggregations.js` | Modificado | Agente de Datos | `buildTrendSeries` con granularidad; `buildCountryMetrics` con sumas absolutas |
+| `advancedAnalytics.js` | Nuevo | Agente de Datos | — |
+| `useAdvancedAnalytics.js` | Nuevo | Agente de Datos (hook) | — |
+
 ---
 
 ## 7. ARCHIVOS DE REFERENCIA EN ESTA CARPETA
@@ -298,12 +371,14 @@ Verificado en el navegador real: al filtrar por "Flujo de trabajo" la tabla de C
 
 ## 8. PRÓXIMOS PASOS SUGERIDOS
 
-1. Calcular `growth` real (variación vs. período anterior) para alimentar los badges de `DashboardSummary` — hoy el prop existe pero no hay lógica que lo produzca.
-2. Extraer `LoadingState` / `ErrorState` genéricos si el patrón inline actual (skeleton + mensaje de error por componente) se vuelve repetitivo al sumar más vistas.
-3. Retirar `Filters.jsx` (legacy) una vez se confirme que no hace falta en ninguna vista.
-4. Tests para `dataService.js`, `useHubspotData.js` y `reportAggregations.js` (parseo, filtros, KPIs, agregaciones).
-5. Revisar tamaño de bundle (`build.rollupOptions.output.manualChunks` en `vite.config.js`) antes de desplegar a producción.
-6. Deploy a Vercel (import del repo de GitHub, framework preset "Vite", sin variables de entorno necesarias por ahora).
+1. Revisar en el editor de columnas del reporte de HubSpot si se puede exportar la URL pública ("ver en el navegador") del correo — si existe, reemplazar la tarjeta de preview de `CampaignDetailView.jsx` por un iframe real de esa URL (sin login, ya confirmado que `info.lentesplus.com` no bloquea iframes). Ver sección 4 para el detalle completo de la investigación.
+2. Calcular `growth` real (variación vs. período anterior) para alimentar los badges de `DashboardSummary` — hoy el prop existe pero no hay lógica que lo produzca.
+3. Tests para `dataService.js`, `useHubspotData.js`, `reportAggregations.js` y `advancedAnalytics.js` (parseo, filtros, KPIs, agregaciones, insights avanzados).
+4. Agregar tooltips de valor absoluto (`Tooltip.jsx`) también en la tabla "Top 5 campañas" de `ReportsView.jsx`, por consistencia con Campañas/Países.
+5. Extraer `LoadingState` / `ErrorState` genéricos si el patrón inline actual (skeleton + mensaje de error por componente) se vuelve repetitivo al sumar más vistas.
+6. Retirar `Filters.jsx` (legacy) una vez se confirme que no hace falta en ninguna vista.
+7. Revisar tamaño de bundle (`build.rollupOptions.output.manualChunks` en `vite.config.js`) antes de desplegar a producción — sigue creciendo con cada feature (ahora ~611 kB).
+8. Deploy a Vercel (import del repo de GitHub, framework preset "Vite", sin variables de entorno necesarias por ahora).
 
 ---
 
@@ -327,6 +402,6 @@ Otros comandos disponibles (`package.json`):
 | `npm run build` | Build de producción en `dist/` (ya validado sin errores) |
 | `npm run preview` | Sirve localmente el build de `dist/` para probarlo como en producción |
 
-Validado en este entorno el 2026-07-09: `npm install`, `npm run build` (bundle OK, CSS con tokens LIVO correctos) y `npm run dev` (responde 200 y sirve HMR de React) — sin errores en ninguno de los tres pasos.
+Validado en este entorno el 2026-07-09 (última corrida, tras la ronda de analítica avanzada): `npm run build` — 850 módulos, `dist/assets/index-*.js` ~611 kB (~176 kB gzip), `dist/assets/index-*.css` ~19 kB (~4.5 kB gzip), sin errores (el warning de chunk >500 kB sigue siendo el único aviso, ver sección 8, ítem 7).
 
-Validado además en el navegador real del usuario (Chrome, macOS, vía Claude in Chrome) el mismo día: las 4 vistas del sidebar (Resumen, Campañas, Países, Configuración) cargan datos reales y coherentes, y la navegación entre ellas funciona correctamente.
+Validado además en el navegador real del usuario (Chrome, macOS, vía Claude in Chrome) el mismo día: las 4 vistas del sidebar cargan datos reales y coherentes, la navegación entre ellas funciona correctamente, y específicamente para esta ronda: el toggle Día/Semana/Mes de la tendencia, el embudo de conversión y la tarjeta de preview sin iframe del detalle de campaña, los tooltips de valor absoluto en Campañas/Países, y las 3 tarjetas de analítica avanzada (Insight del asunto, Salud del dominio, Mejor horario de envío) en la vista Resumen.

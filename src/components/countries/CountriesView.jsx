@@ -8,10 +8,15 @@
  * vive en `reportAggregations.js` (`buildCountryMetrics`, función pura);
  * este componente solo la llama y renderiza tarjetas + tabla con
  * Tailwind, sin lógica de negocio propia.
+ *
+ * TOOLTIPS DE VALOR ABSOLUTO (2026-07-09): cada % (tarjetas y tabla
+ * comparativa) muestra al hacer hover el conteo absoluto agregado del
+ * país detrás de ese promedio, vía `Tooltip.jsx` (CSS puro, sin librerías).
  * ------------------------------------------------------------------
  */
 
 import { buildCountryMetrics } from "../../utils/reportAggregations";
+import Tooltip from "../common/Tooltip";
 
 const COUNTRY_FLAGS = { MX: "🇲🇽", CO: "🇨🇴", CL: "🇨🇱", AR: "🇦🇷", OTHER: "🌐" };
 
@@ -75,13 +80,28 @@ export default function CountriesView({ data = [], loading = false, error = null
             </p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#666]">
               <span>
-                Apertura: <span className="font-mono font-bold text-black">{c.avgOpenRate}%</span>
+                Apertura:{" "}
+                <Tooltip
+                  label={`${c.totalOpens.toLocaleString("es-MX")} aperturas de ${c.totalDelivered.toLocaleString("es-MX")} entregados`}
+                >
+                  <span className="font-mono font-bold text-black">{c.avgOpenRate}%</span>
+                </Tooltip>
               </span>
               <span>
-                Clics: <span className="font-mono font-bold text-black">{c.avgClickRate}%</span>
+                Clics:{" "}
+                <Tooltip
+                  label={`${c.totalClicks.toLocaleString("es-MX")} clics de ${c.totalDelivered.toLocaleString("es-MX")} entregados`}
+                >
+                  <span className="font-mono font-bold text-black">{c.avgClickRate}%</span>
+                </Tooltip>
               </span>
               <span>
-                Rebote: <span className="font-mono font-bold text-black">{c.avgBounceRate}%</span>
+                Rebote:{" "}
+                <Tooltip
+                  label={`${c.totalBounces.toLocaleString("es-MX")} rebotes de ${c.totalSent.toLocaleString("es-MX")} enviados`}
+                >
+                  <span className="font-mono font-bold text-black">{c.avgBounceRate}%</span>
+                </Tooltip>
               </span>
             </div>
           </div>
@@ -111,9 +131,27 @@ export default function CountriesView({ data = [], loading = false, error = null
                   </td>
                   <td className="px-2 py-3 text-right font-mono text-[#666]">{c.campaignCount}</td>
                   <td className="px-2 py-3 text-right font-mono text-[#111]">{c.totalSent.toLocaleString("es-MX")}</td>
-                  <td className="px-2 py-3 text-right font-mono text-[#666]">{c.avgOpenRate}%</td>
-                  <td className="px-2 py-3 text-right font-mono font-bold text-black">{c.avgClickRate}%</td>
-                  <td className="px-2 py-3 text-right font-mono text-[#666]">{c.avgBounceRate}%</td>
+                  <td className="px-2 py-3 text-right font-mono text-[#666]">
+                    <Tooltip
+                      label={`${c.totalOpens.toLocaleString("es-MX")} aperturas de ${c.totalDelivered.toLocaleString("es-MX")} entregados`}
+                    >
+                      {c.avgOpenRate}%
+                    </Tooltip>
+                  </td>
+                  <td className="px-2 py-3 text-right font-mono font-bold text-black">
+                    <Tooltip
+                      label={`${c.totalClicks.toLocaleString("es-MX")} clics de ${c.totalDelivered.toLocaleString("es-MX")} entregados`}
+                    >
+                      {c.avgClickRate}%
+                    </Tooltip>
+                  </td>
+                  <td className="px-2 py-3 text-right font-mono text-[#666]">
+                    <Tooltip
+                      label={`${c.totalBounces.toLocaleString("es-MX")} rebotes de ${c.totalSent.toLocaleString("es-MX")} enviados`}
+                    >
+                      {c.avgBounceRate}%
+                    </Tooltip>
+                  </td>
                 </tr>
               ))}
             </tbody>

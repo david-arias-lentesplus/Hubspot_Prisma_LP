@@ -86,6 +86,11 @@ const COLUMN_ALIASES = {
   senderAddress: ["Dirección del remitente", "Sender address"],
   spamCount: ["Informes de spam", "Spam reports"],
   unsubscribeCount: ["Suscripción cancelada", "Unsubscribed"],
+  // Campos añadidos (2026-07-09) para analítica avanzada (deliverability +
+  // insights de asunto) y el reemplazo del iframe de preview.
+  previewText: ["Línea del asunto y clasificación del texto de vista previa", "Preview text"],
+  hardBounceCount: ["Rebote duro", "Hard bounces"],
+  softBounceCount: ["Rebote suave", "Soft bounces"],
 };
 
 /**
@@ -154,6 +159,21 @@ function safeRate(numerator, denominator) {
 }
 
 /**
+ * Detecta si un texto contiene al menos un emoji (2026-07-09, para el
+ * "Insight del Asunto" — comparar tasa de apertura con/sin emoji en el
+ * `"Asunto"`). Rango Unicode amplio (símbolos misceláneos, pictogramas,
+ * transporte, banderas regionales, dingbats, flechas/símbolos con
+ * variation selector como 👁️) — suficiente para el texto en español de
+ * este dataset, no pretende ser un detector universal de emoji.
+ */
+const EMOJI_REGEX =
+  /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}️]/u;
+
+export function hasEmoji(text = "") {
+  return EMOJI_REGEX.test(text);
+}
+
+/**
  * Extrae el código de país (MX, CO, CL, AR) desde el nombre de campaña
  * buscando el prefijo "MKT_XX". Devuelve "OTHER" si no reconoce ninguno.
  */
@@ -211,6 +231,9 @@ function normalizeRow(rawRow) {
   const clicksCount = toNumber(pickField(rawRow, COLUMN_ALIASES.clicksCount));
   const spamCount = toNumber(pickField(rawRow, COLUMN_ALIASES.spamCount));
   const unsubscribeCount = toNumber(pickField(rawRow, COLUMN_ALIASES.unsubscribeCount));
+  const hardBounceCount = toNumber(pickField(rawRow, COLUMN_ALIASES.hardBounceCount));
+  const softBounceCount = toNumber(pickField(rawRow, COLUMN_ALIASES.softBounceCount));
+  const subject = pickField(rawRow, COLUMN_ALIASES.subject) || "";
 
   return {
     campaignId: pickField(rawRow, COLUMN_ALIASES.campaignId) || "",
@@ -219,11 +242,20 @@ function normalizeRow(rawRow) {
     campaignType: getCampaignTypeFromName(campaignName),
     sentDate: pickField(rawRow, COLUMN_ALIASES.sentDate) || null,
     // Tasas calculadas desde los conteos crudos, no leídas de las columnas
-    // de texto de HubSpot — ver nota junto a `safeRate()` más arriba.
+    // de texto de HubSpot — ver nota junto a `safeRate()` más arriba. Se
+    // mantiene el mismo criterio (2026-07-09) para las tasas de
+    // deliverability nuevas: nunca se leen las columnas de tasa
+    // precalculadas de HubSpot ("Tasa de rebote duro", "Tasa de spam", etc.).
     openRate: safeRate(opensCount, deliveredCount),
     clickRate: safeRate(clicksCount, deliveredCount),
     bounceRate: safeRate(bounceCount, sentCount),
+    hardBounceRate: safeRate(hardBounceCount, sentCount),
+    softBounceRate: safeRate(softBounceCount, sentCount),
+    spamRate: safeRate(spamCount, deliveredCount),
+    unsubscribeRate: safeRate(unsubscribeCount, deliveredCount),
     bounceCount,
+    hardBounceCount,
+    softBounceCount,
     sentCount,
     deliveredCount,
     opensCount,
@@ -232,7 +264,9 @@ function normalizeRow(rawRow) {
     unsubscribeCount,
     // Campos para la vista de detalle de campaña (2026-07-09).
     previewUrl: pickField(rawRow, COLUMN_ALIASES.previewUrl) || "",
-    subject: pickField(rawRow, COLUMN_ALIASES.subject) || "",
+    subject,
+    hasEmoji: hasEmoji(subject),
+    previewText: pickField(rawRow, COLUMN_ALIASES.previewText) || "",
     senderName: pickField(rawRow, COLUMN_ALIASES.senderName) || "",
     senderAddress: pickField(rawRow, COLUMN_ALIASES.senderAddress) || "",
     raw: rawRow, // se conserva la fila original por si se necesita depurar

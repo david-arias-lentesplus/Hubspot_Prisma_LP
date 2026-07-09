@@ -4,11 +4,24 @@
  * Agente UI/UX Frontend — página de detalle de una campaña individual,
  * accesible al hacer click en una fila de `CampaignsView.jsx`.
  *
- * Muestra los KPIs completos de la campaña, un análisis comparativo
+ * Muestra el embudo de conversión de la campaña (Enviados → Entregados →
+ * Aperturas → Clics, `ConversionFunnel.jsx`), un análisis comparativo
  * contra el promedio de campañas del mismo tipo de envío (calculado por
  * `buildCampaignInsights` en `reportAggregations.js`, Agente de Datos) y
- * el correo real embebido vía iframe usando el "Enlace de vista previa"
- * que HubSpot expone por fila (`previewUrl`, ver dataService.js).
+ * una tarjeta de vista previa con el asunto + botón hacia el diseño
+ * original en HubSpot.
+ *
+ * OPCIÓN A — SIN IFRAME (2026-07-09, decisión explícita): la versión
+ * anterior embebía `previewUrl` (`preview.hs-sites.com`) en un iframe,
+ * pero HubSpot bloquea esa vista quedando en blanco — la página de
+ * preview necesita una navegación de nivel superior para validar su
+ * cookie de sesión, algo que los navegadores bloquean dentro de un
+ * iframe de terceros (ver handoff.md sección 4 para el detalle completo,
+ * incluida la investigación de por qué tampoco es reconstruible la URL
+ * pública sin login de `info.lentesplus.com`). En vez de seguir peleando
+ * contra esa limitación, se quitó el iframe por completo y se reemplazó
+ * por una tarjeta con el `subject` + `previewText` de la fila y un botón
+ * primario que abre `previewUrl` en pestaña nueva.
  *
  * Componente de presentación puro: no filtra ni hace fetch — recibe la
  * campaña ya resuelta y el dataset (para el comparativo) desde `App.jsx`.
@@ -17,7 +30,7 @@
 
 import { buildCampaignInsights } from "../../utils/reportAggregations";
 import { CAMPAIGN_TYPES } from "../../services/dataService";
-import MetricCard from "../metrics/MetricCard";
+import ConversionFunnel from "../metrics/ConversionFunnel";
 
 const COUNTRY_LABELS = { MX: "México", CO: "Colombia", CL: "Chile", AR: "Argentina", OTHER: "Otros" };
 const COUNTRY_FLAGS = { MX: "🇲🇽", CO: "🇨🇴", CL: "🇨🇱", AR: "🇦🇷", OTHER: "🌐" };
@@ -143,26 +156,27 @@ export default function CampaignDetailView({ campaign, dataset = [], onBack }) {
         </dl>
       </div>
 
-      {/* --- KPIs --- */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-        <MetricCard titulo="Enviados" valor={campaign.sentCount.toLocaleString("es-MX")} />
-        <MetricCard titulo="Entregados" valor={campaign.deliveredCount.toLocaleString("es-MX")} />
-        <MetricCard
-          titulo="Tasa de apertura"
-          valor={`${campaign.openRate.toFixed(1)}%`}
-          porcentajeCrecimiento={insights?.openRateDiff ?? undefined}
-        />
-        <MetricCard
-          titulo="Tasa de clics"
-          valor={`${campaign.clickRate.toFixed(1)}%`}
-          porcentajeCrecimiento={insights?.clickRateDiff ?? undefined}
-        />
-        {/* Sin badge de variación: en "Tasa de rebote" un valor MÁS BAJO es
-            mejor, al revés que en apertura/clics — el badge de MetricCard
-            asume que "más alto = verde", así que mostrarlo aquí invertido
-            sería confuso junto al texto de Análisis. El contexto vive solo
-            en la sección de Análisis de abajo. */}
-        <MetricCard titulo="Tasa de rebote" valor={`${campaign.bounceRate.toFixed(1)}%`} />
+      {/* --- Embudo de conversión (reemplaza la grilla de tarjetas de KPI, 2026-07-09) --- */}
+      <ConversionFunnel
+        steps={[
+          { label: "Enviados", value: campaign.sentCount },
+          { label: "Entregados", value: campaign.deliveredCount },
+          { label: "Aperturas", value: campaign.opensCount },
+          { label: "Clics", value: campaign.clicksCount },
+        ]}
+      />
+
+      {/* --- Tasas (compactas: el detalle narrativo vs. pares vive en "Análisis" abajo) --- */}
+      <div className="bg-white rounded-card p-4 border border-livo-gray shadow-sm flex flex-wrap gap-x-8 gap-y-2">
+        <span className="text-sm text-[#666]">
+          Tasa de apertura: <span className="font-mono font-bold text-black">{campaign.openRate.toFixed(1)}%</span>
+        </span>
+        <span className="text-sm text-[#666]">
+          Tasa de clics: <span className="font-mono font-bold text-black">{campaign.clickRate.toFixed(1)}%</span>
+        </span>
+        <span className="text-sm text-[#666]">
+          Tasa de rebote: <span className="font-mono font-bold text-black">{campaign.bounceRate.toFixed(1)}%</span>
+        </span>
       </div>
 
       {/* --- Análisis --- */}
@@ -208,45 +222,33 @@ export default function CampaignDetailView({ campaign, dataset = [], onBack }) {
         </div>
       </div>
 
-      {/* --- Vista previa del correo --- */}
+      {/* --- Vista previa del correo (Opción A — sin iframe, 2026-07-09) --- */}
       <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-display font-bold text-lg text-black">Vista previa del correo</h3>
-          {campaign.previewUrl && (
-            <a
-              href={campaign.previewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-livo-blue-500 hover:text-livo-blue-600 transition-colors"
-            >
-              Abrir en pestaña nueva <ExternalLinkIcon />
-            </a>
-          )}
+        <h3 className="font-display font-bold text-lg text-black mb-1">Vista previa del correo</h3>
+        <p className="text-xs text-[#666] mb-4">
+          El diseño no se puede embeber directamente en el dashboard — HubSpot bloquea la vista previa dentro de un
+          iframe. Usa el botón de abajo para verlo en HubSpot.
+        </p>
+
+        <div className="bg-livo-gray/40 rounded-input p-4 mb-5">
+          <p className="text-xs font-bold text-[#666] tracking-[0.5px] mb-1">ASUNTO</p>
+          <p className="text-sm text-[#111] mb-3 break-words">{campaign.subject || "—"}</p>
+
+          <p className="text-xs font-bold text-[#666] tracking-[0.5px] mb-1">TEXTO DE VISTA PREVIA</p>
+          <p className="text-sm text-[#111] break-words">{campaign.previewText || "—"}</p>
         </div>
 
         {campaign.previewUrl ? (
-          <div className="rounded-input border border-livo-gray overflow-hidden">
-            {/*
-              NOTA (2026-07-09, verificado en navegador real): el enlace de
-              "preview.hs-sites.com" carga bien como pestaña propia, pero
-              HubSpot necesita hacer una navegación de nivel superior para
-              validar la sesión de vista previa — dentro de un iframe esa
-              validación puede fallar por las restricciones de cookies de
-              terceros del navegador, dejando el recuadro en blanco. Por eso
-              siempre se deja visible el link "Abrir en pestaña nueva" como
-              alternativa garantizada, además del intento de iframe.
-            */}
-            <p className="px-3 py-2 text-xs text-[#666] bg-livo-gray/40 border-b border-livo-gray">
-              Si el recuadro aparece vacío, tu navegador está bloqueando la vista embebida (cookies de terceros) —
-              usa "Abrir en pestaña nueva" arriba para ver el correo.
-            </p>
-            <iframe
-              src={campaign.previewUrl}
-              title={`Vista previa: ${campaign.campaignName}`}
-              className="w-full h-[720px] bg-white"
-              sandbox="allow-same-origin allow-scripts"
-            />
-          </div>
+          <a
+            href={campaign.previewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 h-12 px-6 w-full sm:w-auto rounded-btn bg-livo-blue-500 text-white
+                       font-bold text-sm tracking-[0.5px] hover:bg-livo-blue-600 active:bg-livo-blue-700
+                       focus:outline-none focus:shadow-focus-primary transition-colors"
+          >
+            Ver diseño original en HubSpot <ExternalLinkIcon />
+          </a>
         ) : (
           <p className="text-sm text-[#AAA]">Esta campaña no tiene un enlace de vista previa disponible.</p>
         )}

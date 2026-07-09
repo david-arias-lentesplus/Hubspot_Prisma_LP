@@ -36,11 +36,13 @@ import DashboardLayout from "./components/layout/DashboardLayout";
 import FiltersBar from "./components/filters/FiltersBar";
 import DashboardSummary from "./components/metrics/DashboardSummary";
 import ReportsView from "./components/reports/ReportsView";
+import AdvancedInsights from "./components/insights/AdvancedInsights";
 import CampaignsView from "./components/campaigns/CampaignsView";
 import CampaignDetailView from "./components/campaigns/CampaignDetailView";
 import CountriesView from "./components/countries/CountriesView";
 import SettingsView from "./components/settings/SettingsView";
 import useHubspotData from "./hooks/useHubspotData";
+import useAdvancedAnalytics from "./hooks/useAdvancedAnalytics";
 import { HUBSPOT_CSV_URL } from "./services/dataService";
 import { computeDateRangeForPreset } from "./utils/dateRangePresets";
 
@@ -93,6 +95,11 @@ export default function App() {
 
   const metrics = useMemo(() => getGlobalMetrics(filteredData), [filteredData, getGlobalMetrics]);
 
+  // Analítica avanzada (2026-07-09): Insight del Asunto, Salud del dominio,
+  // Mejor horario de envío — memoizada sobre el mismo `filteredData` que
+  // usan DashboardSummary/ReportsView, así que respeta los filtros activos.
+  const advancedAnalytics = useAdvancedAnalytics(filteredData);
+
   // Campaña seleccionada para el detalle: se busca en `data` completo (no
   // en `filteredData`) para que siga siendo accesible aunque el usuario
   // toque los filtros mientras ve el detalle.
@@ -125,6 +132,9 @@ export default function App() {
             <DashboardSummary metrics={metrics} loading={loading} error={error} />
           </div>
           <ReportsView data={filteredData} loading={loading} error={error} />
+          <div className="mt-6 sm:mt-8">
+            <AdvancedInsights {...advancedAnalytics} loading={loading} error={error} />
+          </div>
         </>
       )}
 

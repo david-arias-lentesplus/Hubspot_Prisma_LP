@@ -15,36 +15,75 @@
 const COUNTRY_LABELS = { MX: "México", CO: "Colombia", CL: "Chile", AR: "Argentina", OTHER: "Otros" };
 const COUNTRY_ORDER = ["MX", "CO", "CL", "AR", "OTHER"];
 
+// Opciones del toggle de granularidad sobre la gráfica de tendencia
+// (2026-07-09) — ver `ReportsView.jsx`.
+export const TREND_GRANULARITY_OPTIONS = [
+  { value: "day", label: "Día" },
+  { value: "week", label: "Semana" },
+  { value: "month", label: "Mes" },
+];
+
+// Conversión local-safe (evita el corrimiento de zona horaria de
+// `toISOString()`, mismo criterio que `dateRangePresets.js`).
+function toLocalISODate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// Lunes de la semana ISO que contiene `date` (mismo criterio "semana
+// empieza en lunes" que `dateRangePresets.js`).
+function startOfWeek(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay(); // 0=Dom..6=Sáb
+  const diff = day === 0 ? -6 : 1 - day; // días para retroceder hasta el lunes
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
 /**
- * Agrupa las filas por día de `sentDate` y promedia `openRate` / `clickRate`
- * para ese día. Devuelve la serie ordenada cronológicamente, lista para un
- * `LineChart` de Recharts (claves ya en español para usarse directo como
- * `dataKey` + leyenda).
+ * Clave de agrupación para una fecha según la granularidad elegida.
+ * "day" → la fecha misma; "week" → el lunes de esa semana; "month" → el
+ * día 1 de ese mes. Siempre yyyy-mm-dd para poder ordenar con `localeCompare`.
+ */
+function bucketKeyFor(date, granularity) {
+  if (granularity === "week") return toLocalISODate(startOfWeek(date));
+  if (granularity === "month") return toLocalISODate(new Date(date.getFullYear(), date.getMonth(), 1));
+  return toLocalISODate(date);
+}
+
+/**
+ * Agrupa las filas por `sentDate` (día, semana o mes según `granularity`) y
+ * promedia `openRate` / `clickRate` para cada bucket. Devuelve la serie
+ * ordenada cronológicamente, lista para un `LineChart` de Recharts (claves
+ * ya en español para usarse directo como `dataKey` + leyenda).
  *
  * @param {Array<object>} data - filas normalizadas de useHubspotData
+ * @param {"day"|"week"|"month"} [granularity="day"]
  * @returns {Array<{date: string, "Tasa de apertura": number, "Tasa de clics": number}>}
  */
-export function buildTrendSeries(data) {
+export function buildTrendSeries(data, granularity = "day") {
   if (!data || data.length === 0) return [];
 
-  const byDate = new Map();
+  const byBucket = new Map();
 
   for (const row of data) {
     if (!row.sentDate) continue;
     const parsed = new Date(row.sentDate);
     if (Number.isNaN(parsed.getTime())) continue;
 
-    const key = parsed.toISOString().slice(0, 10); // yyyy-mm-dd
-    if (!byDate.has(key)) {
-      byDate.set(key, { date: key, openSum: 0, clickSum: 0, count: 0 });
+    const key = bucketKeyFor(parsed, granularity);
+    if (!byBucket.has(key)) {
+      byBucket.set(key, { date: key, openSum: 0, clickSum: 0, count: 0 });
     }
-    const bucket = byDate.get(key);
+    const bucket = byBucket.get(key);
     bucket.openSum += row.openRate;
     bucket.clickSum += row.clickRate;
     bucket.count += 1;
   }
 
-  return Array.from(byDate.values())
+  return Array.from(byBucket.values())
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((bucket) => ({
       date: bucket.date,
@@ -107,8 +146,15 @@ export function getTopCampaigns(data, limit = 5) {
  * "Países" (tabla de rendimiento por país). Solo devuelve países con
  * al menos una fila.
  *
+ * También suma los valores absolutos (entregados/aperturas/clics/rebotes,
+ * 2026-07-09) para los tooltips de "valor absoluto detrás del %" en
+ * `CountriesView.jsx` — más honesto que intentar reconstruirlos a partir
+ * del promedio de tasas (que perdería precisión al redondear).
+ *
  * @param {Array<object>} data - filas normalizadas de useHubspotData
- * @returns {Array<{country: string, label: string, totalSent: number, avgOpenRate: number, avgClickRate: number, avgBounceRate: number, campaignCount: number}>}
+ * @returns {Array<{country: string, label: string, totalSent: number, totalDelivered: number,
+ *            totalOpens: number, totalClicks: number, totalBounces: number,
+ *            avgOpenRate: number, avgClickRate: number, avgBounceRate: number, campaignCount: number}>}
  */
 export function buildCountryMetrics(data) {
   const byCountry = new Map();
@@ -120,6 +166,10 @@ export function buildCountryMetrics(data) {
         country: code,
         label: COUNTRY_LABELS[code],
         totalSent: 0,
+        totalDelivered: 0,
+        totalOpens: 0,
+        totalClicks: 0,
+        totalBounces: 0,
         openSum: 0,
         clickSum: 0,
         bounceSum: 0,
@@ -128,6 +178,10 @@ export function buildCountryMetrics(data) {
     }
     const bucket = byCountry.get(code);
     bucket.totalSent += row.sentCount;
+    bucket.totalDelivered += row.deliveredCount;
+    bucket.totalOpens += row.opensCount;
+    bucket.totalClicks += row.clicksCount;
+    bucket.totalBounces += row.bounceCount;
     bucket.openSum += row.openRate;
     bucket.clickSum += row.clickRate;
     bucket.bounceSum += row.bounceRate;
@@ -140,6 +194,10 @@ export function buildCountryMetrics(data) {
       country: bucket.country,
       label: bucket.label,
       totalSent: bucket.totalSent,
+      totalDelivered: bucket.totalDelivered,
+      totalOpens: bucket.totalOpens,
+      totalClicks: bucket.totalClicks,
+      totalBounces: bucket.totalBounces,
       campaignCount: bucket.campaignCount,
       avgOpenRate: Number((bucket.openSum / bucket.campaignCount).toFixed(2)),
       avgClickRate: Number((bucket.clickSum / bucket.campaignCount).toFixed(2)),
