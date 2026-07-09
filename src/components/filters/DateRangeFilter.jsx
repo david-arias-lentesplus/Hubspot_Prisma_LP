@@ -12,6 +12,16 @@
  * (Agente de Datos, funciones puras). El commit final hacia afuera
  * ocurre solo al presionar "Actualizar" — hasta entonces todo es estado
  * interno ("staged"), igual que el diseño de referencia.
+ *
+ * PROPS `compact` / `align` (2026-07-09): agregados para que este
+ * componente viva dentro de la `FiltersBar` compacta del header
+ * (`DashboardLayout` → `headerActions`). `compact` reduce el botón
+ * disparador (h-9 en vez de h-11, texto xs, ancho auto en vez de
+ * w-full). `align="right"` ancla el popover por su borde derecho
+ * (`right-0` en vez de `left-0`) para que no se salga del viewport
+ * cuando el trigger está pegado al borde derecho de la pantalla, como
+ * ocurre ahora que la barra de filtros vive en la esquina superior
+ * derecha del header.
  * ------------------------------------------------------------------
  */
 
@@ -159,6 +169,8 @@ function MonthGrid({ year, month, pendingStart, pendingEnd, onDayClick }) {
  * @param {(preset:string)=>void} props.onPresetChange
  * @param {(date:string)=>void} props.onStartDateChange
  * @param {(date:string)=>void} props.onEndDateChange
+ * @param {boolean} [props.compact] - botón disparador más chico (uso en header)
+ * @param {"left"|"right"} [props.align] - borde del popover que se ancla al trigger (default "left")
  */
 export default function DateRangeFilter({
   preset = "all",
@@ -167,6 +179,8 @@ export default function DateRangeFilter({
   onPresetChange,
   onStartDateChange,
   onEndDateChange,
+  compact = false,
+  align = "left",
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [pendingPreset, setPendingPreset] = useState(preset);
@@ -299,12 +313,17 @@ export default function DateRangeFilter({
   const nextYear = viewMonth === 11 ? viewYear + 1 : viewYear;
 
   return (
-    <div className="relative w-full md:w-auto" ref={containerRef}>
+    <div className={`relative ${compact ? "w-auto" : "w-full md:w-auto"}`} ref={containerRef}>
       <button
         type="button"
         onClick={() => setIsOpen((v) => !v)}
-        className="h-11 w-full md:min-w-[220px] px-3 flex items-center gap-2 bg-white border-[1.5px] border-[#DDD] rounded-input text-sm font-body text-[#111]
-                   hover:border-[#AAA] focus:outline-none focus:border-livo-blue-500 focus:shadow-focus-input transition-shadow"
+        className={
+          compact
+            ? "h-9 w-auto min-w-[9.5rem] px-2.5 flex items-center gap-1.5 bg-white border-[1.5px] border-[#DDD] rounded-input text-xs font-body text-[#111] " +
+              "hover:border-[#AAA] focus:outline-none focus:border-livo-blue-500 focus:shadow-focus-input transition-shadow"
+            : "h-11 w-full md:min-w-[220px] px-3 flex items-center gap-2 bg-white border-[1.5px] border-[#DDD] rounded-input text-sm font-body text-[#111] " +
+              "hover:border-[#AAA] focus:outline-none focus:border-livo-blue-500 focus:shadow-focus-input transition-shadow"
+        }
       >
         <CalendarIcon />
         <span className="truncate">{triggerLabel}</span>
@@ -312,8 +331,8 @@ export default function DateRangeFilter({
 
       {isOpen && (
         <div
-          className="absolute z-30 mt-2 left-0 bg-white rounded-card border border-livo-gray shadow-tooltip p-3
-                     w-[min(92vw,620px)] max-h-[80vh] overflow-y-auto"
+          className={`absolute z-30 mt-2 ${align === "right" ? "right-0" : "left-0"} bg-white rounded-card border border-livo-gray shadow-tooltip p-3
+                     w-[min(92vw,620px)] max-h-[80vh] overflow-y-auto`}
         >
           <div className="flex flex-col md:flex-row gap-3">
             {/* --- Lista de presets --- */}

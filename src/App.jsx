@@ -28,6 +28,15 @@
  * detalle siga siendo accesible aunque el usuario ajuste los filtros
  * mientras lo ve; el comparativo de KPIs contra pares sí usa
  * `filteredData` (el filtro activo) — ver `CampaignDetailView.jsx`.
+ *
+ * FILTROS EN EL HEADER (2026-07-09): `FiltersBar` ya no se renderiza
+ * dentro de `<main>` como una tarjeta propia — se pasa como
+ * `headerActions` a `DashboardLayout`, que la ubica en la misma fila
+ * que el título de la vista (título a la izquierda, filtros a la
+ * derecha). Esto libera espacio vertical para mostrar más contenido en
+ * una sola pantalla. Solo se muestra en Resumen, Países y en Campañas
+ * cuando no hay una campaña seleccionada (`showFilters`); en
+ * Configuración y en el detalle de campaña no aplica.
  * ------------------------------------------------------------------
  */
 
@@ -123,11 +132,20 @@ export default function App() {
     />
   );
 
+  // La barra de filtros solo aplica a las vistas con dataset filtrable
+  // (Resumen, Países, Campañas sin detalle abierto). Configuración es
+  // puramente informativa y el detalle de campaña no tiene filtros propios.
+  const showFilters = view === "resumen" || view === "paises" || (view === "campanas" && !selectedCampaignId);
+
   return (
-    <DashboardLayout title={VIEW_TITLES[view] || "Resumen"} activeItemId={view} onNavigate={handleNavigate}>
+    <DashboardLayout
+      title={VIEW_TITLES[view] || "Resumen"}
+      activeItemId={view}
+      onNavigate={handleNavigate}
+      headerActions={showFilters ? filtersBar : null}
+    >
       {view === "resumen" && (
         <>
-          {filtersBar}
           <div className="mb-6 sm:mb-8">
             <DashboardSummary metrics={metrics} loading={loading} error={error} />
           </div>
@@ -140,7 +158,6 @@ export default function App() {
 
       {view === "campanas" && (
         <>
-          {!selectedCampaignId && filtersBar}
           {selectedCampaignId ? (
             <CampaignDetailView
               campaign={selectedCampaign}
@@ -158,12 +175,7 @@ export default function App() {
         </>
       )}
 
-      {view === "paises" && (
-        <>
-          {filtersBar}
-          <CountriesView data={filteredData} loading={loading} error={error} />
-        </>
-      )}
+      {view === "paises" && <CountriesView data={filteredData} loading={loading} error={error} />}
 
       {view === "configuracion" && (
         <SettingsView

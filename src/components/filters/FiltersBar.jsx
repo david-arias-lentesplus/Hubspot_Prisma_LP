@@ -27,6 +27,18 @@
  * Analytics (lista de presets + calendario de 2 meses + Cancelar/
  * Actualizar). Los presets y el cálculo de rangos viven en
  * `src/utils/dateRangePresets.js`.
+ *
+ * BARRA COMPACTA EN EL HEADER (2026-07-09): se rediseñó de tarjeta
+ * propia (`bg-white` + `border` + `p-4/5`, ocupando una fila completa
+ * arriba del contenido) a una fila compacta sin envoltorio, pensada
+ * para vivir dentro del header de `DashboardLayout` junto al título de
+ * la vista (`title` a la izquierda, filtros a la derecha vía el prop
+ * `headerActions`). Esto libera espacio vertical para mostrar más
+ * contenido en una sola pantalla — ver `handoff.md` sección 4. Las
+ * etiquetas ("PAÍS", "TIPO DE ENVÍO"...) que antes iban arriba de cada
+ * control ahora son `sr-only` (accesibles pero no ocupan espacio
+ * visual); el `<select>` sigue comunicando el filtro activo mediante su
+ * opción seleccionada.
  * ------------------------------------------------------------------
  */
 
@@ -48,9 +60,10 @@ const TYPE_OPTIONS = [
   { value: "WORKFLOW", label: "Flujo de trabajo" },
 ];
 
-// Clases compartidas — sección 8 (Inputs & Forms) de DESIGN_SYSTEM-LIVO.md.
+// Clases compartidas — versión compacta de sección 8 (Inputs & Forms) de
+// DESIGN_SYSTEM-LIVO.md, adaptada para vivir en el header (h-9 en vez de h-11).
 const selectClasses =
-  "h-11 w-full px-3 pr-9 bg-white border-[1.5px] border-[#DDD] rounded-input text-sm font-body text-[#111] " +
+  "h-9 w-full pl-2.5 pr-7 bg-white border-[1.5px] border-[#DDD] rounded-input text-xs font-body text-[#111] " +
   "appearance-none cursor-pointer hover:border-[#AAA] focus:outline-none focus:border-livo-blue-500 " +
   "focus:shadow-focus-input transition-shadow";
 
@@ -60,7 +73,7 @@ function ChevronDownIcon() {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      className="w-4 h-4 pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#666]"
+      className="w-3.5 h-3.5 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#666]"
     >
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m6 9 6 6 6-6" />
     </svg>
@@ -101,77 +114,70 @@ export default function FiltersBar({
   }
 
   return (
-    <div className="bg-white rounded-card border border-livo-gray shadow-sm p-4 sm:p-5 mb-6 sm:mb-8">
-      <div className="flex flex-col md:flex-row md:flex-wrap md:items-end gap-4">
-        {/* --- País --- */}
-        <div className="w-full md:w-52">
-          <label htmlFor="filters-country" className="block text-xs font-bold text-[#666] mb-1.5 tracking-[0.5px]">
-            PAÍS
-          </label>
-          <div className="relative">
-            <select
-              id="filters-country"
-              value={country}
-              onChange={(e) => onCountryChange?.(e.target.value)}
-              className={selectClasses}
-            >
-              {COUNTRY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDownIcon />
-          </div>
-        </div>
-
-        {/* --- Tipo de envío (filtro general: Marketing/Automatizado/Flujo de trabajo) --- */}
-        <div className="w-full md:w-52">
-          <label htmlFor="filters-type" className="block text-xs font-bold text-[#666] mb-1.5 tracking-[0.5px]">
-            TIPO DE ENVÍO
-          </label>
-          <div className="relative">
-            <select
-              id="filters-type"
-              value={campaignType}
-              onChange={(e) => onCampaignTypeChange?.(e.target.value)}
-              className={selectClasses}
-            >
-              {TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDownIcon />
-          </div>
-        </div>
-
-        {/* --- Rango de fechas (popover: presets + calendario de 2 meses) --- */}
-        <div className="w-full md:w-auto">
-          <label className="block text-xs font-bold text-[#666] mb-1.5 tracking-[0.5px]">RANGO DE FECHAS</label>
-          <DateRangeFilter
-            preset={datePreset}
-            startDate={startDate}
-            endDate={endDate}
-            onPresetChange={onDatePresetChange}
-            onStartDateChange={onStartDateChange}
-            onEndDateChange={onEndDateChange}
-          />
-        </div>
-
-        {/* --- Limpiar filtros --- */}
-        <button
-          type="button"
-          onClick={handleReset}
-          className="h-11 px-[18px] rounded-btn border-[1.5px] border-livo-blue-500 bg-[#F5F5F5] text-livo-blue-500
-                     font-bold text-sm tracking-[0.5px] whitespace-nowrap
-                     hover:bg-[#E8E8FF] active:bg-[#D0D0FF]
-                     focus:outline-none focus:shadow-focus-primary transition-colors shrink-0 md:ml-auto"
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {/* --- País --- */}
+      <div className="relative w-[9.5rem]">
+        <label htmlFor="filters-country" className="sr-only">
+          País
+        </label>
+        <select
+          id="filters-country"
+          value={country}
+          onChange={(e) => onCountryChange?.(e.target.value)}
+          className={selectClasses}
         >
-          Limpiar filtros
-        </button>
+          {COUNTRY_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDownIcon />
       </div>
+
+      {/* --- Tipo de envío (filtro general: Marketing/Automatizado/Flujo de trabajo) --- */}
+      <div className="relative w-[9.5rem]">
+        <label htmlFor="filters-type" className="sr-only">
+          Tipo de envío
+        </label>
+        <select
+          id="filters-type"
+          value={campaignType}
+          onChange={(e) => onCampaignTypeChange?.(e.target.value)}
+          className={selectClasses}
+        >
+          {TYPE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDownIcon />
+      </div>
+
+      {/* --- Rango de fechas (popover: presets + calendario de 2 meses) --- */}
+      <DateRangeFilter
+        preset={datePreset}
+        startDate={startDate}
+        endDate={endDate}
+        onPresetChange={onDatePresetChange}
+        onStartDateChange={onStartDateChange}
+        onEndDateChange={onEndDateChange}
+        compact
+        align="right"
+      />
+
+      {/* --- Limpiar filtros --- */}
+      <button
+        type="button"
+        onClick={handleReset}
+        className="h-9 px-3 rounded-btn border-[1.5px] border-livo-blue-500 bg-[#F5F5F5] text-livo-blue-500
+                   font-bold text-xs tracking-[0.5px] whitespace-nowrap
+                   hover:bg-[#E8E8FF] active:bg-[#D0D0FF]
+                   focus:outline-none focus:shadow-focus-primary transition-colors shrink-0"
+      >
+        Limpiar filtros
+      </button>
     </div>
   );
 }

@@ -11,6 +11,14 @@
  * Este componente es puramente de presentación: no hace fetch ni
  * conoce la lógica de datos. Recibe el contenido de cada vista via
  * `children` y el título de la vista actual via `title`.
+ *
+ * BARRA DE FILTROS EN EL HEADER (2026-07-09): el header ahora acepta un
+ * prop `headerActions` (ej. la `FiltersBar` compacta) que se renderiza
+ * a la derecha del título, en la misma fila. Esto libera el espacio que
+ * antes ocupaba la `FiltersBar` como tarjeta propia dentro de `<main>`,
+ * mostrando más contenido en una sola pantalla. `App.jsx` decide qué
+ * vista recibe `headerActions` (Resumen/Campañas/Países la reciben,
+ * Configuración y el detalle de campaña no).
  * ------------------------------------------------------------------
  */
 
@@ -66,6 +74,7 @@ const DEFAULT_NAV_ITEMS = [
  * @param {Array<{id:string,label:string,icon:string}>} [props.navItems] - items del sidebar
  * @param {string} [props.activeItemId] - id del item activo (controlado desde afuera, opcional)
  * @param {(id:string)=>void} [props.onNavigate] - callback al hacer click en un item del sidebar
+ * @param {React.ReactNode} [props.headerActions] - contenido a la derecha del header (ej. FiltersBar compacta)
  */
 export default function DashboardLayout({
   children,
@@ -73,6 +82,7 @@ export default function DashboardLayout({
   navItems = DEFAULT_NAV_ITEMS,
   activeItemId,
   onNavigate,
+  headerActions,
 }) {
   // Si el padre no controla el item activo, el layout mantiene su propio estado interno.
   const [internalActiveId, setInternalActiveId] = useState(navItems[0]?.id);
@@ -135,8 +145,9 @@ export default function DashboardLayout({
 
       {/* ---------- Área principal ---------- */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white border-b border-livo-gray flex items-center px-8 shrink-0">
-          <h1 className="font-display font-bold text-2xl text-black">{title}</h1>
+        <header className="min-h-16 bg-white border-b border-livo-gray flex items-center justify-between flex-wrap gap-x-4 gap-y-2 px-8 py-2.5 shrink-0">
+          <h1 className="font-display font-bold text-2xl text-black shrink-0">{title}</h1>
+          {headerActions && <div className="shrink-0 ml-auto">{headerActions}</div>}
         </header>
 
         <main className="flex-1 p-8 overflow-y-auto">{children}</main>

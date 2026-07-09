@@ -1,7 +1,7 @@
 # HANDOFF — Dashboard de HubSpot (Lentesplus)
 
 > Fuente de la verdad del proyecto. Se actualiza cada vez que se hace un cambio importante en la arquitectura, se agrega una nueva librería, o se resuelve un bug complejo ("Actualiza el handoff").
-> Owner: David · Última actualización: 2026-07-09 (analítica avanzada: Insight del Asunto, Salud del dominio, Mejor horario de envío; embudo de conversión reemplaza las tarjetas de KPI de campaña; iframe de vista previa eliminado — reemplazado por tarjeta + botón a HubSpot; toggle Día/Semana/Mes en tendencia; tooltips de valor absoluto en tablas)
+> Owner: David · Última actualización: 2026-07-09 (analítica avanzada: Insight del Asunto, Salud del dominio, Mejor horario de envío; embudo de conversión reemplaza las tarjetas de KPI de campaña; iframe de vista previa eliminado — reemplazado por tarjeta + botón a HubSpot; toggle Día/Semana/Mes en tendencia; tooltips de valor absoluto en tablas; `FiltersBar` movida al header — título a la izquierda, filtros a la derecha, mismo alto de fila)
 
 ---
 
@@ -70,7 +70,7 @@ mails hubspot lentesplus/
     │   └── dateRangePresets.js          # cálculo de rangos (Ayer/7d/28d/90d/semana/mes/año/personalizado) + grilla de calendario
     └── components/
         ├── layout/
-        │   └── DashboardLayout.jsx      # Sidebar (logo Prisma/Lentesplus) + área principal + navegación real
+        │   └── DashboardLayout.jsx      # Sidebar (logo Prisma/Lentesplus) + área principal + navegación real; header con `headerActions` (título izq., filtros der., 2026-07-09)
         ├── metrics/
         │   ├── MetricCard.jsx           # card de KPI (título/valor/crecimiento) — con hover:shadow-md
         │   ├── DashboardSummary.jsx     # grid de 4 MetricCard + estados loading/error
@@ -80,8 +80,8 @@ mails hubspot lentesplus/
         ├── insights/
         │   └── AdvancedInsights.jsx     # NUEVO — compone Insight del Asunto + Salud del dominio + Mejor horario, vista "Resumen"
         ├── filters/
-        │   ├── FiltersBar.jsx           # barra superior de filtros (país + tipo de envío + rango de fechas)
-        │   ├── DateRangeFilter.jsx      # popover de fechas estilo Google Analytics (presets + calendario 2 meses, tamaño compactado 2026-07-09)
+        │   ├── FiltersBar.jsx           # fila compacta de filtros (país + tipo de envío + rango de fechas + limpiar) — vive en `headerActions` del header, ya no en `<main>` (2026-07-09)
+        │   ├── DateRangeFilter.jsx      # popover de fechas estilo Google Analytics (presets + calendario 2 meses); props `compact`/`align="right"` (2026-07-09) para encajar en el header
         │   └── Filters.jsx              # ⚠️ LEGACY — sustituido por FiltersBar.jsx (ver sección 8)
         ├── reports/
         │   └── ReportsView.jsx          # vista "Resumen": LineChart (con toggle Día/Semana/Mes) + BarChart (recharts) + tabla Top 5
@@ -176,6 +176,16 @@ Ronda grande de trabajo pedida explícitamente por David, dividida por rol (Agen
 - [x] **Agente UI/UX — `AdvancedInsights.jsx`** (nuevo componente): compone las 3 tarjetas de analítica avanzada y se monta en la vista "Resumen", debajo de `ReportsView`. Incluye un mapa de calor básico (7 días × 24 horas, opacidad de `livo-blue-500` proporcional a la tasa de apertura de cada celda) para "Mejor horario de envío".
 - [x] Verificado en el navegador real (Claude in Chrome): toggle Día/Semana/Mes cambia la gráfica correctamente en los 3 modos; detalle de campaña muestra el embudo con barras y % correctos y la tarjeta de preview sin iframe (incluido el campo `previewText`, confirmado mostrando "Question Format" tal como viene en el CSV crudo); tooltips muestran el valor absoluto correcto en Campañas y Países; las 3 tarjetas de analítica avanzada renderizan con datos reales (incluida al menos una alerta/estado "sin alertas" de Salud del dominio). Nota: el bug del badge de "Tasa de rebote" en `MetricCard` (fila de la sección 4) quedó automáticamente resuelto de raíz al quitar la grilla de `MetricCard` del detalle de campaña — `MetricCard` ya no se usa en `CampaignDetailView.jsx`.
 
+**Filtros movidos al header (2026-07-09):**
+
+Pedido explícito de David: liberar espacio vertical mostrando más contenido en una sola pantalla, moviendo País/Tipo de envío/Rango de fechas/Limpiar filtros a la misma fila del título de cada vista (título arriba a la izquierda, filtros arriba a la derecha), en vez de la tarjeta propia que `FiltersBar` ocupaba encima del contenido.
+
+- [x] `DashboardLayout.jsx` — el `<header>` pasa de `h-16` fijo con solo el título a `min-h-16` + `flex items-center justify-between flex-wrap`, con un nuevo prop `headerActions` (React node) que se renderiza a la derecha del `<h1>`. `flex-wrap` + `min-h-16` (en vez de `h-16` fijo) permite que la fila crezca si los filtros no caben en una sola línea en pantallas angostas, sin cortar contenido.
+- [x] `FiltersBar.jsx` — rediseño completo: se quitó el wrapper de tarjeta (`bg-white`/`border`/`shadow-sm`/`p-4-5`/`mb-6-8`) y las etiquetas visibles arriba de cada `<select>` (ahora `sr-only`, accesibles pero sin ocupar espacio). Selects compactados de `h-11`/`text-sm` a `h-9`/`text-xs`, ancho fijo `w-[9.5rem]` en vez de `md:w-52`. Botón "Limpiar filtros" compactado a `h-9`/`text-xs`. El resultado es una fila horizontal angosta (`flex flex-wrap items-center justify-end gap-2`) pensada para vivir en el header.
+- [x] `DateRangeFilter.jsx` — nuevos props `compact` (botón disparador `h-9`/`text-xs`/ancho auto en vez de `h-11`/`text-sm`/`w-full`) y `align` (`"left"` default sin cambios, `"right"` ancla el popover por su borde derecho — `right-0` en vez de `left-0` — para que no se salga del viewport ahora que el trigger vive pegado a la esquina superior derecha de la pantalla). `FiltersBar.jsx` pasa `compact align="right"`.
+- [x] `App.jsx` — se eliminó el render de `{filtersBar}` dentro de `<main>` en Resumen/Campañas/Países; ahora se calcula `showFilters` (`true` en Resumen y Países, y en Campañas solo si no hay `selectedCampaignId`) y `filtersBar` se pasa como `headerActions` a `DashboardLayout`. En Configuración y en el detalle de campaña `headerActions` es `null` — el header solo muestra el título.
+- [x] Verificado con `npm run build` (850 módulos, sin errores) y en el navegador real (Claude in Chrome): las 4 vistas muestran el título a la izquierda y los filtros compactos a la derecha en la misma fila; el popover de `DateRangeFilter` abre alineado a la derecha sin desbordar el viewport; Configuración y el detalle de campaña muestran el header sin filtros, como se esperaba; Resumen y Países ahora muestran más contenido "above the fold" (en Resumen se alcanza a ver el KPI grid completo + la gráfica de tendencia sin scroll; en Países se alcanza a ver la tabla comparativa completa).
+
 ### Falta
 
 - [ ] Estados visuales `LoadingState` / `ErrorState` genéricos y reutilizables (hoy cada componente nuevo implementa su propio skeleton/error inline; conviene extraerlos)
@@ -184,6 +194,7 @@ Ronda grande de trabajo pedida explícitamente por David, dividida por rol (Agen
 - [ ] Tests para servicios de datos y agregaciones (parseo, filtros, cálculo de KPIs, `reportAggregations.js`, `dateRangePresets.js`)
 - [ ] Code-splitting / `manualChunks` — Vite advierte que el bundle JS (~586 kB) supera los 500 kB recomendados; no bloquea el desarrollo pero conviene revisarlo antes de producción
 - [ ] `DateRangeFilter.jsx`: el popover en mobile podría afinarse más (hoy se ve pero es angosto con 2 meses lado a lado en pantallas muy chicas); considerar mostrar 1 solo mes en `sm` como ya hace parcialmente
+- [ ] `FiltersBar` en el header (2026-07-09): falta verificar explícitamente en viewport móvil real (hoy solo se verificó desktop) que el `flex-wrap` del header de `DashboardLayout.jsx` no genere un salto de línea feo entre el título y los filtros en pantallas angostas; candidato a mover a un patrón de "filtros colapsables" (ícono + drawer) en mobile si el wrap actual no se ve bien
 - [ ] **Mejorar la vista previa del correo con la URL pública real (`info.lentesplus.com`), no reconstruida** — la forma correcta de hacer esto es agregar la URL pública como columna del export de HubSpot (o vía su API con un backend), NO adivinándola desde el Asunto — ver sección 4 para por qué se descartó la reconstrucción. Con la Opción A ya implementada (tarjeta + botón, sin iframe) esto ya no es urgente, pero seguiría siendo una mejora si la URL se vuelve exportable.
 - [ ] Tests para `advancedAnalytics.js` (`buildEmojiInsight`, `buildDeliverabilityHealth`, `buildBestSendTime`) — mismo pendiente que el resto de la capa de datos, ver ítem de tests más abajo
 - [ ] Tooltips de valor absoluto (`Tooltip.jsx`) en la tabla "Top 5 campañas" de `ReportsView.jsx` — quedó fuera del alcance explícito del pedido ("las tablas (Campañas y Comparativo por país)"), pero sería consistente agregarlos ahí también
@@ -355,6 +366,9 @@ Verificado en el navegador real: al filtrar por "Flujo de trabajo" la tabla de C
 | `reportAggregations.js` | Modificado | Agente de Datos | `buildTrendSeries` con granularidad; `buildCountryMetrics` con sumas absolutas |
 | `advancedAnalytics.js` | Nuevo | Agente de Datos | — |
 | `useAdvancedAnalytics.js` | Nuevo | Agente de Datos (hook) | — |
+| `DashboardLayout.jsx` | Modificado (2026-07-09) | Todas las vistas (header) | Nuevo prop `headerActions`; header pasa de `h-16` fijo a `min-h-16 flex-wrap` con título izq. / filtros der. |
+| `FiltersBar.jsx` | Rediseñado (2026-07-09) | `headerActions` de Resumen/Campañas/Países | Deja de ser una tarjeta propia en `<main>`; ahora es una fila compacta sin wrapper, vive en el header |
+| `DateRangeFilter.jsx` | Modificado (2026-07-09) | Dentro de `FiltersBar.jsx` | Nuevos props `compact` (trigger `h-9`) y `align="right"` (popover no se desborda del viewport en el header) |
 
 ---
 
@@ -379,6 +393,7 @@ Verificado en el navegador real: al filtrar por "Flujo de trabajo" la tabla de C
 6. Retirar `Filters.jsx` (legacy) una vez se confirme que no hace falta en ninguna vista.
 7. Revisar tamaño de bundle (`build.rollupOptions.output.manualChunks` en `vite.config.js`) antes de desplegar a producción — sigue creciendo con cada feature (ahora ~611 kB).
 8. Deploy a Vercel (import del repo de GitHub, framework preset "Vite", sin variables de entorno necesarias por ahora).
+9. Verificar en viewport móvil real el nuevo header con `FiltersBar` (título + filtros en la misma fila, `flex-wrap`) — solo se validó en desktop en esta ronda; si el wrap se ve apretado, evaluar un patrón de filtros colapsables (ícono + drawer) para mobile.
 
 ---
 
@@ -402,6 +417,6 @@ Otros comandos disponibles (`package.json`):
 | `npm run build` | Build de producción en `dist/` (ya validado sin errores) |
 | `npm run preview` | Sirve localmente el build de `dist/` para probarlo como en producción |
 
-Validado en este entorno el 2026-07-09 (última corrida, tras la ronda de analítica avanzada): `npm run build` — 850 módulos, `dist/assets/index-*.js` ~611 kB (~176 kB gzip), `dist/assets/index-*.css` ~19 kB (~4.5 kB gzip), sin errores (el warning de chunk >500 kB sigue siendo el único aviso, ver sección 8, ítem 7).
+Validado en este entorno el 2026-07-09 (última corrida, tras mover `FiltersBar` al header): `npm run build` — 850 módulos, `dist/assets/index-*.js` ~610.6 kB (~176.3 kB gzip), `dist/assets/index-*.css` ~19.6 kB (~4.6 kB gzip), sin errores (el warning de chunk >500 kB sigue siendo el único aviso, ver sección 8, ítem 7). Nota de sandbox: el build se corrió con `--outDir` temporal porque `dist/` en la carpeta del proyecto tenía protección de borrado del entorno — no afecta al build real del usuario, que corre `npm run build` normalmente y escribe en `dist/` sin problema.
 
-Validado además en el navegador real del usuario (Chrome, macOS, vía Claude in Chrome) el mismo día: las 4 vistas del sidebar cargan datos reales y coherentes, la navegación entre ellas funciona correctamente, y específicamente para esta ronda: el toggle Día/Semana/Mes de la tendencia, el embudo de conversión y la tarjeta de preview sin iframe del detalle de campaña, los tooltips de valor absoluto en Campañas/Países, y las 3 tarjetas de analítica avanzada (Insight del asunto, Salud del dominio, Mejor horario de envío) en la vista Resumen.
+Validado además en el navegador real del usuario (Chrome, macOS, vía Claude in Chrome) el mismo día: las 4 vistas del sidebar cargan datos reales y coherentes, la navegación entre ellas funciona correctamente, y específicamente para esta ronda: el toggle Día/Semana/Mes de la tendencia, el embudo de conversión y la tarjeta de preview sin iframe del detalle de campaña, los tooltips de valor absoluto en Campañas/Países, y las 3 tarjetas de analítica avanzada (Insight del asunto, Salud del dominio, Mejor horario de envío) en la vista Resumen — y, para el cambio de esta ronda, que el título quede a la izquierda y los filtros compactos a la derecha en la misma fila del header en Resumen/Campañas/Países, que el popover de `DateRangeFilter` (alineado a la derecha) no se salga del viewport, y que Configuración y el detalle de campaña muestren el header sin filtros.
