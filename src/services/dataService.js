@@ -17,12 +17,31 @@
 
 import Papa from "papaparse";
 
-// URL del CSV (ver handoff.md sección 1 — actualizada el 2026-07-09: ahora
-// se consume el archivo CSV alojado en Google Drive, no el pub de Sheets).
-// Formato de descarga directa de Drive; el fetch sigue el redirect 303 hacia
-// drive.usercontent.google.com automáticamente y trae CORS abierto (*).
+// URL del CSV (ver handoff.md sección 1 y 4 — historial completo del cambio).
+//
+// OJO — dos problemas encontrados y descartados el 2026-07-09 con la URL de
+// Google Drive ("https://drive.google.com/uc?export=download&id=..." y su
+// destino final "https://drive.usercontent.google.com/download?id=..."):
+//   1. La primera responde 403 a cualquier fetch() real de navegador (envía
+//      header Origin; curl no, por eso "funcionaba" en pruebas con curl).
+//   2. Su destino final SÍ acepta Origin, pero Google aplica una cuota de
+//      vistas/descargas por archivo compartido públicamente — una vez
+//      agotada (confirmado con Chrome real: 503 en 4/4 intentos, mientras
+//      curl seguía recibiendo 200 desde otra IP) el navegador lo reporta
+//      como "Failed to fetch" porque la respuesta 503 no trae los headers
+//      CORS de éxito.
+//
+// Fix: se volvió a la URL "Publicar en la web" de Google Sheets, pensada
+// específicamente para consumo público sin límite de cuota. Verificada
+// repetidas veces con `Origin` real: siempre 200 + `access-control-allow-origin: *`.
+//
+// Si en el futuro el dato maestro se mueve definitivamente a un archivo de
+// Drive (no un Sheet), NO volver a apuntar el fetch del navegador ahí
+// directamente — habría que meter un proxy server-side (p. ej. función
+// serverless en Vercel) que descargue el archivo del lado del servidor
+// (sin CORS ni cuota por IP de usuario final) y se lo sirva al frontend.
 export const HUBSPOT_CSV_URL =
-  "https://drive.google.com/uc?export=download&id=16NDo9dY2VgvisYIz9Lmf7w5K4_0Lynej";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVMjhgnoi0H2fH9GLFgD-3f1VyIEC_EKeixdOZDpc0OeVaY0WWqSeojUdTUoVzdh_07W0OATyvSP2J/pub?gid=0&single=true&output=csv";
 
 // Prefijos de país reconocidos en el nombre de campaña (ej. "MKT_MX_Verano2026")
 const COUNTRY_PREFIXES = ["MX", "CO", "CL", "AR"];
@@ -34,7 +53,7 @@ const COUNTRY_PREFIXES = ["MX", "CO", "CL", "AR"];
  * "Tasa de apertura", "Tasa de clics", "Tasa de rebote", "Rebotes",
  * "Enviado", "Entregado", "Abierto", "Con clic".
  *
- * OJO — dos bugs detectados y corregidos contra la primera versión de este
+ * OJO — bugs detectados y corregidos contra la primera versión de este
  * archivo:
  * 1) La clasificación de país por prefijo `MKT_XX` funciona con la columna
  *    "Nombre del correo" (ej. "MKT_MX_EMMBrand_..."), NO con "Campaña"
@@ -42,8 +61,11 @@ const COUNTRY_PREFIXES = ["MX", "CO", "CL", "AR"];
  *    `MKT_XX`/`_XX_` esperado por `getCountryFromCampaign`). Por eso
  *    "Nombre del correo" va primero en el alias de `campaignName`.
  * 2) "Rebotes" es un CONTEO absoluto (rebote duro + suave), no una tasa.
- *    La tasa real está en "Tasa de rebote". Se prioriza esta última para
- *    `bounceRate` y se agrega `bounceCount` aparte para el conteo.
+ * 3) Las columnas de tasa PRECALCULADAS por HubSpot ("Tasa de apertura",
+ *    "Tasa de clics", "Tasa de rebote", etc.) llegan con formato corrupto
+ *    de forma INCONSISTENTE tanto en el CSV de Drive como en el pub de
+ *    Sheets — ver la nota extensa junto a `safeRate()` más abajo sobre por
+ *    qué se dejó de usar esas columnas por completo.
  *
  * Si el CSV cambia sus headers, ajustar únicamente `COLUMN_ALIASES` — el
  * resto del servicio no necesita cambios.
@@ -51,14 +73,19 @@ const COUNTRY_PREFIXES = ["MX", "CO", "CL", "AR"];
 const COLUMN_ALIASES = {
   campaignName: ["Nombre del correo", "Nombre de campaña", "Nombre de la campaña", "Campaña", "Campaign", "Campaign name"],
   sentDate: ["Fecha de envío (tu zona horaria)", "Fecha de envío", "Fecha envío", "Send date", "Fecha"],
-  openRate: ["Tasa de apertura", "Open rate", "% Apertura"],
-  clickRate: ["Tasa de clics", "Click rate", "% Clics"],
-  bounceRate: ["Tasa de rebote", "Bounce rate", "% Rebote"],
   bounceCount: ["Rebotes", "Bounces"],
   sentCount: ["Enviado", "Enviados", "Envíos", "Sent", "Total enviados"],
   deliveredCount: ["Entregado", "Delivered"],
   opensCount: ["Abierto", "Opens"],
   clicksCount: ["Con clic", "Clicks"],
+  // Campos añadidos (2026-07-09) para la vista de detalle de campaña.
+  campaignId: ["ID del correo de marketing", "ID de correo", "Campaign ID"],
+  previewUrl: ["Enlace de vista previa", "Preview URL"],
+  subject: ["Asunto", "Subject"],
+  senderName: ["Nombre del remitente", "Sender name"],
+  senderAddress: ["Dirección del remitente", "Sender address"],
+  spamCount: ["Informes de spam", "Spam reports"],
+  unsubscribeCount: ["Suscripción cancelada", "Unsubscribed"],
 };
 
 /**
@@ -87,57 +114,43 @@ function toNumber(value) {
 }
 
 /**
- * BUG DE ORIGEN (detectado el 2026-07-09 al cambiar la fuente del CSV a
- * Google Drive, ver handoff.md sección 4): el nuevo archivo pierde el punto
- * decimal en los valores de las columnas de tasas ("Tasa de apertura",
- * "Tasa de clics", "Tasa de rebote", "Tasa de entregas", "Tasa de
- * clickthrough") cada vez que el valor original tenía exactamente 3
- * decimales — ej. "15.162" llega como "15162". Los valores con 0, 1 o 2
- * decimales llegan intactos.
+ * DECISIÓN DE ARQUITECTURA (2026-07-09): ya NO se usan las columnas de tasa
+ * precalculadas por HubSpot ("Tasa de apertura", "Tasa de clics", "Tasa de
+ * rebote", etc.) para nada — `openRate`, `clickRate` y `bounceRate` se
+ * calculan siempre a partir de los conteos crudos (`Abierto`, `Con clic`,
+ * `Rebotes`, `Enviado`, `Entregado`), que no muestran ninguna corrupción de
+ * formato en ninguna de las dos fuentes probadas.
  *
- * Se validó comparando las 436 filas contra la fuente anterior (Sheets pub):
- * el patrón es 100% consistente y, más importante, los rangos NO se
- * solapan — los valores corrompidos (reconstruidos) caen siempre en
- * [1000, ~99999], mientras que los valores genuinos sin decimales (que
- * nunca fueron tocados) caen siempre por debajo de 1000 (máx. observado 988).
- * Esto permite reconstruir el valor original de forma segura:
- *   - si el string trae ".", se respeta tal cual (no fue corrompido).
- *   - si es un entero sin "." y >= 1000, se asume que perdió 3 decimales
- *     fusionados y se divide entre 1000.
- *   - si es un entero sin "." y < 1000, es un valor genuino sin decimales.
+ * Por qué: se detectaron DOS bugs de formato distintos e inconsistentes
+ * entre sí en las columnas de tasa, en ambas fuentes (Drive y Sheets pub):
+ *   1. En el CSV de Drive, un valor con exactamente 3 decimales pierde el
+ *      punto ("15.162" → "15162"). El rango resultante siempre caía ≥1000,
+ *      así que en su momento se "arregló" dividiendo entre 1000 solo los
+ *      enteros ≥1000 (ver historial en handoff.md sección 4).
+ *   2. Al volver a la fuente de Sheets pub (mismo día, por la cuota de
+ *      descargas de Drive — ver handoff.md), se encontró que columnas de
+ *      tasas con escala naturalmente pequeña ("Tasa de clics", "Tasa de
+ *      rebote", típicamente <2%) sufren la MISMA pérdida de punto decimal,
+ *      pero el resultado corrompido cae POR DEBAJO de 1000 (ej. "0.147" →
+ *      "147"), rompiendo la regla ">=1000" de arriba. Esto producía KPIs
+ *      imposibles en el dashboard (ej. "213% de tasa de clics").
  *
- * Aplicar solo a columnas de tasas/porcentajes (`parseRateValue`), nunca a
- * columnas de conteo absoluto (Enviado, Entregado, Abierto, Con clic,
- * Rebotes), que no se ven afectadas por este bug.
+ * En vez de perseguir una tercera heurística de texto (fragil y difícil de
+ * validar a futuro), se calculan las tasas nosotros mismos:
+ *   openRate   = Abierto / Entregado * 100
+ *   clickRate  = Con clic / Entregado * 100
+ *   bounceRate = Rebotes / Enviado * 100
  *
- * SEGUNDO BUG DE ORIGEN (mismo archivo, detectado en la misma validación):
- * un puñado de valores de tasa que "parecen fecha" en formato día.mes
- * (ej. "21.06", "12.5") fueron auto-convertidos a fecha completa por la
- * herramienta que generó el CSV — ej. "21.06" → "2026-06-21 00:00:00".
- * Afecta ~1% de las filas (4-7 filas por columna de tasa). Se revierte
- * extrayendo día y mes de la fecha y reconstruyendo "día.mes" como número.
- * OJO: esto es una reconstrucción con ambigüedad inherente — no hay forma
- * de saber si el original tenía 1 o 2 decimales (ej. "12.5" y "12.05" dan
- * la misma fecha "12 de mayo"), así que se asume 2 decimales (mes tal cual,
- * sin forzar el padding). El error resultante es pequeño y afecta <2% de
- * las filas; documentar si se necesita mayor precisión en el futuro.
+ * Validado contra las 435 filas reales de la fuente de Sheets pub comparando
+ * este cálculo contra las columnas de tasa (ya corregidas manualmente fila
+ * por fila): diferencia máxima 0.0005 puntos porcentuales — coincide
+ * esencialmente perfecto salvo redondeo. Esto además hace la app inmune a
+ * que HubSpot/Sheets/Drive vuelvan a corromper el formato de esas columnas
+ * de texto en el futuro, ya que ni siquiera se leen.
  */
-function parseRateValue(value) {
-  if (value === undefined || value === null || value === "") return 0;
-  const str = String(value).trim();
-
-  const dateMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (dateMatch) {
-    const day = parseInt(dateMatch[3], 10);
-    const month = parseInt(dateMatch[2], 10);
-    return Number(`${day}.${month}`);
-  }
-
-  if (str.includes(".") || str.includes(",")) return toNumber(str);
-
-  const asInt = parseInt(str, 10);
-  if (Number.isNaN(asInt)) return 0;
-  return asInt >= 1000 ? asInt / 1000 : asInt;
+function safeRate(numerator, denominator) {
+  if (!denominator || denominator <= 0) return 0;
+  return Number(((numerator / denominator) * 100).toFixed(3));
 }
 
 /**
@@ -155,24 +168,73 @@ export function getCountryFromCampaign(campaignName = "") {
 }
 
 /**
+ * Clasificación por tipo de envío ("Nombre del correo"), pensada como filtro
+ * general del dashboard (aplica a Resumen, Campañas y Países).
+ *
+ * Validado el 2026-07-09 contra las 436 filas reales de la fuente Sheets pub
+ * — los 4 prefijos cubren el 100% de las filas sin solapes:
+ *   MKT       (149 filas) → Marketing
+ *   AUTO      ( 67 filas) → Automatizado
+ *   WorkFlow  (158 filas) → Flujo de trabajo (nota: HubSpot exporta esta
+ *   Workflow  ( 62 filas)   categoría con el prefijo en dos variantes de
+ *             capitalización distintas — "WorkFlow_..." y "Workflow_...".
+ *             Se normaliza a mayúsculas antes de comparar, así que ambas
+ *             caen en el mismo grupo "WORKFLOW".
+ * Total: 149 + 67 + 158 + 62 = 436 ✓ (coincide con el total de filas).
+ */
+export const CAMPAIGN_TYPES = {
+  MKT: "Marketing",
+  AUTO: "Automatizado",
+  WORKFLOW: "Flujo de trabajo",
+  OTHER: "Otros",
+};
+
+export function getCampaignTypeFromName(campaignName = "") {
+  const upper = campaignName.toUpperCase();
+  if (upper.startsWith("MKT")) return "MKT";
+  if (upper.startsWith("AUTO")) return "AUTO";
+  if (upper.startsWith("WORKFLOW")) return "WORKFLOW";
+  return "OTHER";
+}
+
+/**
  * Normaliza una fila cruda del CSV (headers en español, strings) a un
  * objeto con claves en camelCase y tipos correctos.
  */
 function normalizeRow(rawRow) {
   const campaignName = pickField(rawRow, COLUMN_ALIASES.campaignName) || "";
 
+  const bounceCount = toNumber(pickField(rawRow, COLUMN_ALIASES.bounceCount));
+  const sentCount = toNumber(pickField(rawRow, COLUMN_ALIASES.sentCount));
+  const deliveredCount = toNumber(pickField(rawRow, COLUMN_ALIASES.deliveredCount));
+  const opensCount = toNumber(pickField(rawRow, COLUMN_ALIASES.opensCount));
+  const clicksCount = toNumber(pickField(rawRow, COLUMN_ALIASES.clicksCount));
+  const spamCount = toNumber(pickField(rawRow, COLUMN_ALIASES.spamCount));
+  const unsubscribeCount = toNumber(pickField(rawRow, COLUMN_ALIASES.unsubscribeCount));
+
   return {
+    campaignId: pickField(rawRow, COLUMN_ALIASES.campaignId) || "",
     campaignName,
     country: getCountryFromCampaign(campaignName),
+    campaignType: getCampaignTypeFromName(campaignName),
     sentDate: pickField(rawRow, COLUMN_ALIASES.sentDate) || null,
-    openRate: parseRateValue(pickField(rawRow, COLUMN_ALIASES.openRate)),
-    clickRate: parseRateValue(pickField(rawRow, COLUMN_ALIASES.clickRate)),
-    bounceRate: parseRateValue(pickField(rawRow, COLUMN_ALIASES.bounceRate)),
-    bounceCount: toNumber(pickField(rawRow, COLUMN_ALIASES.bounceCount)),
-    sentCount: toNumber(pickField(rawRow, COLUMN_ALIASES.sentCount)),
-    deliveredCount: toNumber(pickField(rawRow, COLUMN_ALIASES.deliveredCount)),
-    opensCount: toNumber(pickField(rawRow, COLUMN_ALIASES.opensCount)),
-    clicksCount: toNumber(pickField(rawRow, COLUMN_ALIASES.clicksCount)),
+    // Tasas calculadas desde los conteos crudos, no leídas de las columnas
+    // de texto de HubSpot — ver nota junto a `safeRate()` más arriba.
+    openRate: safeRate(opensCount, deliveredCount),
+    clickRate: safeRate(clicksCount, deliveredCount),
+    bounceRate: safeRate(bounceCount, sentCount),
+    bounceCount,
+    sentCount,
+    deliveredCount,
+    opensCount,
+    clicksCount,
+    spamCount,
+    unsubscribeCount,
+    // Campos para la vista de detalle de campaña (2026-07-09).
+    previewUrl: pickField(rawRow, COLUMN_ALIASES.previewUrl) || "",
+    subject: pickField(rawRow, COLUMN_ALIASES.subject) || "",
+    senderName: pickField(rawRow, COLUMN_ALIASES.senderName) || "",
+    senderAddress: pickField(rawRow, COLUMN_ALIASES.senderAddress) || "",
     raw: rawRow, // se conserva la fila original por si se necesita depurar
   };
 }

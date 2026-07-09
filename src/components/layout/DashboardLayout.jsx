@@ -88,12 +88,12 @@ export default function DashboardLayout({
       {/* ---------- Sidebar ---------- */}
       <aside className="w-64 shrink-0 bg-black text-white flex flex-col">
         <div className="h-16 flex items-center gap-2.5 px-6 border-b border-white/10">
-          {/* Logo ficticio LIVO / Lentesplus */}
+          {/* Logo ficticio Prisma / Lentesplus */}
           <span className="flex items-center justify-center w-8 h-8 shrink-0 rounded-card bg-livo-lime-500 text-black font-display font-extrabold text-sm">
-            L
+            P
           </span>
           <div className="leading-tight">
-            <p className="font-display font-extrabold text-base tracking-[0.5px]">LIVO</p>
+            <p className="font-display font-extrabold text-base tracking-[0.5px]">Prisma</p>
             <p className="font-body text-[10px] text-white/50 -mt-0.5">Lentesplus · HubSpot</p>
           </div>
         </div>
@@ -129,7 +129,7 @@ export default function DashboardLayout({
         </nav>
 
         <div className="px-6 py-4 border-t border-white/10 text-xs text-white/50">
-          Lentesplus SAS · livo.com
+          Lentesplus SAS · Prisma
         </div>
       </aside>
 

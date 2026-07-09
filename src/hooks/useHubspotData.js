@@ -8,8 +8,11 @@
  *   - data:              array normalizado (ver dataService.js)
  *   - loading:           boolean
  *   - error:             string | null
+ *   - lastFetchedAt:     Date | null — momento del último fetch exitoso
+ *   - refetch:           () => void — vuelve a descargar el CSV bajo demanda
  *   - filterByDateRange: (startDate, endDate) => array
  *   - filterByCountry:   (countryCode) => array
+ *   - filterByType:      (campaignType) => array — Marketing/Automatizado/Flujo de trabajo/Todos
  *   - getGlobalMetrics:  (dataset?) => { totalSent, avgOpenRate, avgClickRate, avgBounceRate }
  *
  * Los componentes UI (Agente UI/UX) consumen exclusivamente este hook:
@@ -24,6 +27,10 @@ export function useHubspotData() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastFetchedAt, setLastFetchedAt] = useState(null);
+  // Incrementar este contador desde `refetch()` vuelve a disparar el useEffect
+  // de abajo y repite la descarga del CSV bajo demanda (botón "Refrescar datos").
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -33,7 +40,10 @@ export function useHubspotData() {
       setError(null);
       try {
         const rows = await fetchHubspotData();
-        if (isMounted) setData(rows);
+        if (isMounted) {
+          setData(rows);
+          setLastFetchedAt(new Date());
+        }
       } catch (err) {
         if (isMounted) setError(err.message || "Error desconocido al cargar los datos de HubSpot.");
       } finally {
@@ -46,6 +56,10 @@ export function useHubspotData() {
     return () => {
       isMounted = false;
     };
+  }, [reloadKey]);
+
+  const refetch = useCallback(() => {
+    setReloadKey((key) => key + 1);
   }, []);
 
   /**
@@ -87,6 +101,22 @@ export function useHubspotData() {
   );
 
   /**
+   * Filtra un dataset (por defecto, `data`) por tipo de envío, extraído del
+   * prefijo del nombre de campaña en dataService.js (`campaignType`:
+   * "MKT" | "AUTO" | "WORKFLOW" | "OTHER"). "TODOS" o falsy devuelve el
+   * dataset completo sin filtrar. Es un filtro general del dashboard —
+   * aplica igual en Resumen, Campañas y Países. No muta el array original.
+   */
+  const filterByType = useCallback(
+    (campaignType, dataset = data) => {
+      if (!campaignType || campaignType.toUpperCase() === "TODOS") return dataset;
+      const type = campaignType.toUpperCase();
+      return dataset.filter((row) => row.campaignType === type);
+    },
+    [data]
+  );
+
+  /**
    * Calcula métricas globales sobre un dataset (por defecto, `data`):
    * suma de envíos, promedio de tasa de apertura y promedio de tasa de clics.
    * Devuelve ceros si el dataset está vacío (evita NaN / división por cero).
@@ -119,8 +149,11 @@ export function useHubspotData() {
     data,
     loading,
     error,
+    lastFetchedAt,
+    refetch,
     filterByDateRange,
     filterByCountry,
+    filterByType,
     getGlobalMetrics,
     globalMetrics,
   };

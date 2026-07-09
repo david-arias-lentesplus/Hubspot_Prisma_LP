@@ -101,4 +101,89 @@ export function getTopCampaigns(data, limit = 5) {
     }));
 }
 
+/**
+ * Agrupa las filas por país y calcula, por país: total enviados y los
+ * promedios de tasa de apertura/clics/rebote. Pensado para la vista
+ * "Países" (tabla de rendimiento por país). Solo devuelve países con
+ * al menos una fila.
+ *
+ * @param {Array<object>} data - filas normalizadas de useHubspotData
+ * @returns {Array<{country: string, label: string, totalSent: number, avgOpenRate: number, avgClickRate: number, avgBounceRate: number, campaignCount: number}>}
+ */
+export function buildCountryMetrics(data) {
+  const byCountry = new Map();
+
+  for (const row of data || []) {
+    const code = COUNTRY_ORDER.includes(row.country) ? row.country : "OTHER";
+    if (!byCountry.has(code)) {
+      byCountry.set(code, {
+        country: code,
+        label: COUNTRY_LABELS[code],
+        totalSent: 0,
+        openSum: 0,
+        clickSum: 0,
+        bounceSum: 0,
+        campaignCount: 0,
+      });
+    }
+    const bucket = byCountry.get(code);
+    bucket.totalSent += row.sentCount;
+    bucket.openSum += row.openRate;
+    bucket.clickSum += row.clickRate;
+    bucket.bounceSum += row.bounceRate;
+    bucket.campaignCount += 1;
+  }
+
+  return COUNTRY_ORDER.map((code) => byCountry.get(code))
+    .filter(Boolean)
+    .map((bucket) => ({
+      country: bucket.country,
+      label: bucket.label,
+      totalSent: bucket.totalSent,
+      campaignCount: bucket.campaignCount,
+      avgOpenRate: Number((bucket.openSum / bucket.campaignCount).toFixed(2)),
+      avgClickRate: Number((bucket.clickSum / bucket.campaignCount).toFixed(2)),
+      avgBounceRate: Number((bucket.bounceSum / bucket.campaignCount).toFixed(2)),
+    }));
+}
+
+/**
+ * Compara una campaña puntual contra sus "pares" (mismo `campaignType`,
+ * dentro del mismo dataset ya filtrado por país/fecha que recibe la vista
+ * activa) para dar contexto en la página de detalle de campaña
+ * (`CampaignDetailView.jsx`). No hay serie histórica por campaña individual
+ * en el CSV, así que el análisis se basa en esta comparación contra el
+ * promedio de campañas del mismo tipo de envío.
+ *
+ * @param {object} campaign - fila normalizada de la campaña seleccionada
+ * @param {Array<object>} dataset - dataset ya filtrado (país/fecha/tipo) de useHubspotData
+ * @returns {{peerCount:number, peerAvgOpenRate:number|null, peerAvgClickRate:number|null,
+ *            peerAvgBounceRate:number|null, openRateDiff:number|null, clickRateDiff:number|null,
+ *            bounceRateDiff:number|null}}
+ */
+export function buildCampaignInsights(campaign, dataset = []) {
+  if (!campaign) return null;
+
+  const peers = (dataset || []).filter(
+    (row) => row.campaignType === campaign.campaignType && row.campaignId !== campaign.campaignId
+  );
+
+  const avg = (key) =>
+    peers.length ? Number((peers.reduce((sum, r) => sum + r[key], 0) / peers.length).toFixed(2)) : null;
+
+  const peerAvgOpenRate = avg("openRate");
+  const peerAvgClickRate = avg("clickRate");
+  const peerAvgBounceRate = avg("bounceRate");
+
+  return {
+    peerCount: peers.length,
+    peerAvgOpenRate,
+    peerAvgClickRate,
+    peerAvgBounceRate,
+    openRateDiff: peerAvgOpenRate === null ? null : Number((campaign.openRate - peerAvgOpenRate).toFixed(2)),
+    clickRateDiff: peerAvgClickRate === null ? null : Number((campaign.clickRate - peerAvgClickRate).toFixed(2)),
+    bounceRateDiff: peerAvgBounceRate === null ? null : Number((campaign.bounceRate - peerAvgBounceRate).toFixed(2)),
+  };
+}
+
 export { COUNTRY_LABELS };
