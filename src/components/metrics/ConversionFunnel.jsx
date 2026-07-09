@@ -32,9 +32,9 @@ export default function ConversionFunnel({ steps = [] }) {
   if (steps.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm">
-      <h3 className="font-display font-bold text-lg text-black mb-1">Embudo de conversión</h3>
-      <p className="text-xs text-[#666] mb-5">
+    <div className="bg-white dark:bg-[#1C1C24] rounded-card p-6 border border-livo-gray dark:border-white/10 shadow-sm">
+      <h3 className="font-display font-bold text-lg text-black dark:text-white mb-1">Embudo de conversión</h3>
+      <p className="text-xs text-[#666] dark:text-white/60 mb-5">
         {steps.map((s) => s.label).join(" → ")}
       </p>
 
@@ -50,17 +50,17 @@ export default function ConversionFunnel({ steps = [] }) {
           return (
             <div key={step.label}>
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 mb-1 text-xs">
-                <span className="font-bold text-[#666] tracking-[0.5px]">{step.label.toUpperCase()}</span>
-                <span className="text-[#666]">
+                <span className="font-bold text-[#666] dark:text-white/50 tracking-[0.5px]">{step.label.toUpperCase()}</span>
+                <span className="text-[#666] dark:text-white/60">
                   {stepConversion !== null && (
                     <span className="mr-2">
                       {stepConversion.toFixed(1)}% vs. {prevStep.label.toLowerCase()}
                     </span>
                   )}
-                  <span className="font-mono font-bold text-black">{overallConversion.toFixed(1)}% del total</span>
+                  <span className="font-mono font-bold text-black dark:text-white">{overallConversion.toFixed(1)}% del total</span>
                 </span>
               </div>
-              <div className="w-full h-9 bg-livo-gray rounded-input overflow-hidden">
+              <div className="w-full h-9 bg-livo-gray dark:bg-white/10 rounded-input overflow-hidden">
                 <div
                   className={`h-full ${STEP_BAR_CLASSES[i % STEP_BAR_CLASSES.length]} ${STEP_TEXT_CLASSES[i % STEP_TEXT_CLASSES.length]} flex items-center px-3 rounded-input transition-all duration-300`}
                   style={{ width: `${widthPct}%` }}

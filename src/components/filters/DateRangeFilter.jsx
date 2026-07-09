@@ -88,7 +88,7 @@ function RadioDot({ checked }) {
     <span
       className={[
         "w-[18px] h-[18px] rounded-full border-[1.5px] shrink-0 flex items-center justify-center transition-colors",
-        checked ? "bg-livo-blue-500 border-livo-blue-500" : "bg-[#F5F5F5] border-[#AAA]",
+        checked ? "bg-livo-blue-500 border-livo-blue-500" : "bg-[#F5F5F5] dark:bg-white/10 border-[#AAA] dark:border-white/30",
       ].join(" ")}
     >
       {checked && <span className="w-2 h-2 rounded-full bg-white" />}
@@ -105,14 +105,14 @@ function MonthGrid({ year, month, pendingStart, pendingEnd, onDayClick }) {
 
   return (
     <div className="w-full">
-      <p className="text-center font-body font-bold text-xs text-[#111] mb-2 capitalize">
+      <p className="text-center font-body font-bold text-xs text-[#111] dark:text-white/90 mb-2 capitalize">
         {MONTH_NAMES[month]} {year}
       </p>
       <table className="w-full border-collapse">
         <thead>
           <tr>
             {WEEKDAY_LABELS.map((d) => (
-              <th key={d} className="text-[10px] font-bold text-[#666] font-body pb-1">
+              <th key={d} className="text-[10px] font-bold text-[#666] dark:text-white/50 font-body pb-1">
                 {d}
               </th>
             ))}
@@ -145,7 +145,7 @@ function MonthGrid({ year, month, pendingStart, pendingEnd, onDayClick }) {
                         "w-7 h-7 flex items-center justify-center text-xs rounded-full transition-colors",
                         isStart || isEnd
                           ? "bg-livo-blue-500 text-white font-bold"
-                          : "text-[#111] hover:bg-livo-gray",
+                          : "text-[#111] dark:text-white/90 hover:bg-livo-gray dark:hover:bg-white/10",
                       ].join(" ")}
                     >
                       {cell.day}
@@ -319,33 +319,33 @@ export default function DateRangeFilter({
         onClick={() => setIsOpen((v) => !v)}
         className={
           compact
-            ? "h-9 w-auto min-w-[9.5rem] px-2.5 flex items-center gap-1.5 bg-white border-[1.5px] border-[#DDD] rounded-input text-xs font-body text-[#111] " +
+            ? "h-9 w-auto min-w-[9.5rem] px-2.5 flex items-center gap-1.5 bg-white dark:bg-white/5 border-[1.5px] border-[#DDD] dark:border-white/20 rounded-input text-xs font-body text-[#111] dark:text-white " +
               "hover:border-[#AAA] focus:outline-none focus:border-livo-blue-500 focus:shadow-focus-input transition-shadow"
             : "h-11 w-full md:min-w-[220px] px-3 flex items-center gap-2 bg-white border-[1.5px] border-[#DDD] rounded-input text-sm font-body text-[#111] " +
               "hover:border-[#AAA] focus:outline-none focus:border-livo-blue-500 focus:shadow-focus-input transition-shadow"
         }
       >
         <CalendarIcon />
-        <span className="truncate">{triggerLabel}</span>
+        <span className="truncate dark:text-white">{triggerLabel}</span>
       </button>
 
       {isOpen && (
         <div
-          className={`absolute z-30 mt-2 ${align === "right" ? "right-0" : "left-0"} bg-white rounded-card border border-livo-gray shadow-tooltip p-3
+          className={`absolute z-30 mt-2 ${align === "right" ? "right-0" : "left-0"} bg-white dark:bg-[#1C1C24] rounded-card border border-livo-gray dark:border-white/10 shadow-tooltip p-3
                      w-[min(92vw,620px)] max-h-[80vh] overflow-y-auto`}
         >
           <div className="flex flex-col md:flex-row gap-3">
             {/* --- Lista de presets --- */}
-            <div className="md:w-36 shrink-0 md:border-r md:border-livo-gray md:pr-3 flex flex-row md:flex-col flex-wrap gap-0.5">
+            <div className="md:w-36 shrink-0 md:border-r md:border-livo-gray dark:md:border-white/10 md:pr-3 flex flex-row md:flex-col flex-wrap gap-0.5">
               {DATE_PRESET_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
                   onClick={() => handlePresetSelect(opt.value)}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-card hover:bg-livo-gray/60 transition-colors text-left"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-card hover:bg-livo-gray/60 dark:hover:bg-white/10 transition-colors text-left"
                 >
                   <RadioDot checked={pendingPreset === opt.value} />
-                  <span className="text-xs text-[#111] whitespace-nowrap">{opt.label}</span>
+                  <span className="text-xs text-[#111] dark:text-white/90 whitespace-nowrap">{opt.label}</span>
                 </button>
               ))}
             </div>
@@ -356,7 +356,7 @@ export default function DateRangeFilter({
                 <button
                   type="button"
                   onClick={() => shiftMonth(-1)}
-                  className="w-7 h-7 flex items-center justify-center rounded-card text-[#666] hover:bg-livo-gray transition-colors"
+                  className="w-7 h-7 flex items-center justify-center rounded-card text-[#666] dark:text-white/60 hover:bg-livo-gray dark:hover:bg-white/10 transition-colors"
                   aria-label="Mes anterior"
                 >
                   <ChevronIcon direction="left" />
@@ -364,7 +364,7 @@ export default function DateRangeFilter({
                 <button
                   type="button"
                   onClick={() => shiftMonth(1)}
-                  className="w-7 h-7 flex items-center justify-center rounded-card text-[#666] hover:bg-livo-gray transition-colors md:hidden"
+                  className="w-7 h-7 flex items-center justify-center rounded-card text-[#666] dark:text-white/60 hover:bg-livo-gray dark:hover:bg-white/10 transition-colors md:hidden"
                   aria-label="Mes siguiente"
                 >
                   <ChevronIcon direction="right" />
@@ -383,7 +383,7 @@ export default function DateRangeFilter({
                   <button
                     type="button"
                     onClick={() => shiftMonth(1)}
-                    className="absolute -right-1 -top-1 w-7 h-7 flex items-center justify-center rounded-card text-[#666] hover:bg-livo-gray transition-colors"
+                    className="absolute -right-1 -top-1 w-7 h-7 flex items-center justify-center rounded-card text-[#666] dark:text-white/60 hover:bg-livo-gray dark:hover:bg-white/10 transition-colors"
                     aria-label="Mes siguiente"
                   >
                     <ChevronIcon direction="right" />
@@ -404,7 +404,7 @@ export default function DateRangeFilter({
                   <select
                     value={pendingPreset}
                     onChange={(e) => handlePresetSelect(e.target.value)}
-                    className="h-9 w-full px-2 pr-7 bg-white border-[1.5px] border-[#DDD] rounded-input text-xs font-body text-[#111]
+                    className="h-9 w-full px-2 pr-7 bg-white dark:bg-white/5 border-[1.5px] border-[#DDD] dark:border-white/20 rounded-input text-xs font-body text-[#111] dark:text-white
                                appearance-none cursor-pointer hover:border-[#AAA] focus:outline-none focus:border-livo-blue-500
                                focus:shadow-focus-input transition-shadow"
                   >
@@ -428,20 +428,20 @@ export default function DateRangeFilter({
                   readOnly
                   value={formatLong(pendingStart)}
                   placeholder="Fecha inicio"
-                  className="h-9 flex-1 min-w-0 px-2 bg-[#F5F5F5] border-[1.5px] border-[#DDD] rounded-input text-xs font-body text-[#111] truncate"
+                  className="h-9 flex-1 min-w-0 px-2 bg-[#F5F5F5] dark:bg-white/5 border-[1.5px] border-[#DDD] dark:border-white/20 rounded-input text-xs font-body text-[#111] dark:text-white truncate"
                 />
                 <input
                   type="text"
                   readOnly
                   value={formatLong(pendingEnd)}
                   placeholder="Fecha fin"
-                  className="h-9 flex-1 min-w-0 px-2 bg-[#F5F5F5] border-[1.5px] border-[#DDD] rounded-input text-xs font-body text-[#111] truncate"
+                  className="h-9 flex-1 min-w-0 px-2 bg-[#F5F5F5] dark:bg-white/5 border-[1.5px] border-[#DDD] dark:border-white/20 rounded-input text-xs font-body text-[#111] dark:text-white truncate"
                 />
               </div>
 
               {/* --- Resumen + acciones --- */}
               <div className="flex items-center justify-between mt-3 gap-3 flex-wrap">
-                <p className="text-xs text-[#111] font-medium">
+                <p className="text-xs text-[#111] dark:text-white/90 font-medium">
                   {pendingStart && pendingEnd
                     ? `${formatShort(pendingStart)} – ${formatShort(pendingEnd)}`
                     : "Selecciona un rango en el calendario"}
@@ -450,8 +450,8 @@ export default function DateRangeFilter({
                   <button
                     type="button"
                     onClick={handleCancel}
-                    className="h-9 px-3 rounded-btn border-[1.5px] border-livo-blue-500 bg-[#F5F5F5] text-livo-blue-500
-                               font-bold text-xs tracking-[0.5px] hover:bg-[#E8E8FF] active:bg-[#D0D0FF]
+                    className="h-9 px-3 rounded-btn border-[1.5px] border-livo-blue-500 bg-[#F5F5F5] dark:bg-white/5 text-livo-blue-500 dark:text-livo-blue-300
+                               font-bold text-xs tracking-[0.5px] hover:bg-[#E8E8FF] dark:hover:bg-white/10 active:bg-[#D0D0FF]
                                focus:outline-none focus:shadow-focus-primary transition-colors"
                   >
                     Cancelar

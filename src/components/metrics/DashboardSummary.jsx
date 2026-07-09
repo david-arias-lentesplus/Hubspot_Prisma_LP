@@ -8,16 +8,24 @@
  * del hook `useHubspotData` — y las distribuye en un CSS Grid de 4
  * `MetricCard`. No hace fetch ni cálculos: esa lógica vive en la capa
  * de datos (`useHubspotData.js` / `dataService.js`).
+ *
+ * BENCHMARKS SEMAFÓRICOS (2026-07-09, fase "Enterprise"): las tarjetas de
+ * Tasa de apertura y Tasa de clics reciben además un prop `benchmark`
+ * (`getBenchmarkStatus()` de `src/utils/benchmarks.js`, Agente de Datos)
+ * que `MetricCard` traduce en un punto verde/amarillo/rojo junto al
+ * título. "Total enviados" y "Tasa de rebote" no tienen meta de industria
+ * en este alcance (ver `benchmarks.js`), así que no reciben ese prop.
  * ------------------------------------------------------------------
  */
 
 import MetricCard from "./MetricCard";
+import { getBenchmarkStatus } from "../../utils/benchmarks";
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm animate-pulse">
-      <div className="h-3 w-24 bg-livo-gray rounded mb-3" />
-      <div className="h-8 w-20 bg-livo-gray rounded" />
+    <div className="bg-white dark:bg-[#1C1C24] rounded-card p-6 border border-livo-gray dark:border-white/10 shadow-sm animate-pulse">
+      <div className="h-3 w-24 bg-livo-gray dark:bg-white/10 rounded mb-3" />
+      <div className="h-8 w-20 bg-livo-gray dark:bg-white/10 rounded" />
     </div>
   );
 }
@@ -60,11 +68,13 @@ export default function DashboardSummary({ metrics, growth, loading = false, err
       titulo: "Tasa de apertura promedio",
       valor: `${avgOpenRate.toFixed(1)}%`,
       porcentajeCrecimiento: growth?.avgOpenRate,
+      benchmark: getBenchmarkStatus("openRate", avgOpenRate),
     },
     {
       titulo: "Tasa de clics promedio",
       valor: `${avgClickRate.toFixed(1)}%`,
       porcentajeCrecimiento: growth?.avgClickRate,
+      benchmark: getBenchmarkStatus("clickRate", avgClickRate),
     },
     {
       titulo: "Tasa de rebote",

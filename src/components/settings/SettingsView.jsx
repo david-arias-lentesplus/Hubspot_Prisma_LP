@@ -40,7 +40,7 @@ function ExternalLinkIcon() {
 // ven como inputs del sistema de diseño pero con `disabled`, para dejar
 // visualmente claro que no son editables desde aquí.
 const readOnlyFieldClasses =
-  "h-11 w-full px-3 bg-livo-gray/60 border-[1.5px] border-[#DDD] rounded-input text-xs font-mono text-[#666] " +
+  "h-11 w-full px-3 bg-livo-gray/60 dark:bg-white/5 border-[1.5px] border-[#DDD] dark:border-white/20 rounded-input text-xs font-mono text-[#666] dark:text-white/60 " +
   "truncate cursor-not-allowed disabled:opacity-100";
 
 /**
@@ -64,37 +64,37 @@ export default function SettingsView({
 }) {
   return (
     <div className="grid grid-cols-1 gap-6 max-w-2xl">
-      <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm">
+      <div className="bg-white dark:bg-[#1C1C24] rounded-card p-6 border border-livo-gray dark:border-white/10 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-bold text-lg text-black">Fuente de datos</h3>
-          <span className="inline-flex items-center px-[10px] py-[2px] rounded-badge text-xs font-bold bg-livo-gray/70 border border-[#DDD] text-[#666]">
+          <h3 className="font-display font-bold text-lg text-black dark:text-white">Fuente de datos</h3>
+          <span className="inline-flex items-center px-[10px] py-[2px] rounded-badge text-xs font-bold bg-livo-gray/70 dark:bg-white/10 border border-[#DDD] dark:border-white/20 text-[#666] dark:text-white/60">
             Solo lectura
           </span>
         </div>
 
         <dl className="grid grid-cols-1 gap-4 text-sm">
           <div>
-            <dt className="text-xs font-bold text-[#666] tracking-[0.5px] mb-1">NOMBRE DE LA HOJA DE CÁLCULO</dt>
-            <dd className="font-body font-bold text-[#111]">{sheetName}</dd>
+            <dt className="text-xs font-bold text-[#666] dark:text-white/50 tracking-[0.5px] mb-1">NOMBRE DE LA HOJA DE CÁLCULO</dt>
+            <dd className="font-body font-bold text-[#111] dark:text-white/90">{sheetName}</dd>
           </div>
 
           <div>
-            <dt className="text-xs font-bold text-[#666] tracking-[0.5px] mb-1">URL DEL CSV PUBLICADO</dt>
+            <dt className="text-xs font-bold text-[#666] dark:text-white/50 tracking-[0.5px] mb-1">URL DEL CSV PUBLICADO</dt>
             <input type="text" readOnly disabled value={csvUrl} className={readOnlyFieldClasses} />
           </div>
 
           {sheetUrl && (
             <div>
-              <dt className="text-xs font-bold text-[#666] tracking-[0.5px] mb-1">HOJA DE CÁLCULO EN GOOGLE SHEETS</dt>
+              <dt className="text-xs font-bold text-[#666] dark:text-white/50 tracking-[0.5px] mb-1">HOJA DE CÁLCULO EN GOOGLE SHEETS</dt>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input type="text" readOnly disabled value={sheetUrl} className={readOnlyFieldClasses} />
                 <a
                   href={sheetUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-btn border-[1.5px] border-livo-blue-500 bg-[#F5F5F5] text-livo-blue-500
+                  className="inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-btn border-[1.5px] border-livo-blue-500 bg-[#F5F5F5] dark:bg-white/5 text-livo-blue-500 dark:text-livo-blue-300
                              font-bold text-xs tracking-[0.5px] whitespace-nowrap shrink-0
-                             hover:bg-[#E8E8FF] active:bg-[#D0D0FF]
+                             hover:bg-[#E8E8FF] dark:hover:bg-white/10 active:bg-[#D0D0FF]
                              focus:outline-none focus:shadow-focus-primary transition-colors"
                 >
                   Abrir hoja <ExternalLinkIcon />
@@ -105,12 +105,12 @@ export default function SettingsView({
 
           <div className="flex flex-wrap gap-x-8 gap-y-4">
             <div>
-              <dt className="text-xs font-bold text-[#666] tracking-[0.5px] mb-1">FILAS CARGADAS</dt>
-              <dd className="font-mono font-bold text-xl text-black">{rowCount.toLocaleString("es-MX")}</dd>
+              <dt className="text-xs font-bold text-[#666] dark:text-white/50 tracking-[0.5px] mb-1">FILAS CARGADAS</dt>
+              <dd className="font-mono font-bold text-xl text-black dark:text-white">{rowCount.toLocaleString("es-MX")}</dd>
             </div>
             <div>
-              <dt className="text-xs font-bold text-[#666] tracking-[0.5px] mb-1">ÚLTIMA ACTUALIZACIÓN</dt>
-              <dd className="font-mono text-sm text-[#111]">{formatTimestamp(lastFetchedAt)}</dd>
+              <dt className="text-xs font-bold text-[#666] dark:text-white/50 tracking-[0.5px] mb-1">ÚLTIMA ACTUALIZACIÓN</dt>
+              <dd className="font-mono text-sm text-[#111] dark:text-white/90">{formatTimestamp(lastFetchedAt)}</dd>
             </div>
           </div>
         </dl>
@@ -126,15 +126,15 @@ export default function SettingsView({
         >
           {loading ? "Actualizando…" : "Refrescar datos"}
         </button>
-        <p className="mt-2 text-xs text-[#AAA]">
+        <p className="mt-2 text-xs text-[#AAA] dark:text-white/40">
           Este botón solo vuelve a consultar la fuente — ningún campo de esta página es editable.
         </p>
       </div>
 
-      <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm">
-        <h3 className="font-display font-bold text-lg text-black mb-2">Sistema de diseño</h3>
-        <p className="text-sm text-[#666]">
-          Toda la UI sigue <code className="font-mono text-xs bg-livo-gray/60 px-1.5 py-0.5 rounded">DESIGN_SYSTEM-LIVO.md</code> —
+      <div className="bg-white dark:bg-[#1C1C24] rounded-card p-6 border border-livo-gray dark:border-white/10 shadow-sm">
+        <h3 className="font-display font-bold text-lg text-black dark:text-white mb-2">Sistema de diseño</h3>
+        <p className="text-sm text-[#666] dark:text-white/60">
+          Toda la UI sigue <code className="font-mono text-xs bg-livo-gray/60 dark:bg-white/10 px-1.5 py-0.5 rounded">DESIGN_SYSTEM-LIVO.md</code> —
           paleta de marca Prisma, tipografía Ballinger/Poppins/T29 Carbon y spacing base-4px. No configurable desde aquí.
         </p>
       </div>

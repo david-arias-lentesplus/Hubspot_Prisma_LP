@@ -244,4 +244,26 @@ export function buildCampaignInsights(campaign, dataset = []) {
   };
 }
 
+/**
+ * Filtra campañas por texto libre contra `campaignName` ("Nombre del
+ * correo") o `subject` ("Asunto"), sin distinguir mayúsculas/minúsculas.
+ * Pensado para el buscador de `CampaignsView.jsx` (2026-07-09, fase
+ * "Enterprise") — función pura, no toca el DOM ni React. Un `searchTerm`
+ * vacío devuelve el dataset sin filtrar. No muta el array original.
+ *
+ * @param {Array<object>} data - filas normalizadas de useHubspotData
+ * @param {string} searchTerm
+ * @returns {Array<object>}
+ */
+export function filterCampaignsBySearch(data, searchTerm) {
+  const term = (searchTerm || "").trim().toLowerCase();
+  if (!term) return data || [];
+
+  return (data || []).filter((row) => {
+    const name = (row.campaignName || "").toLowerCase();
+    const subject = (row.subject || "").toLowerCase();
+    return name.includes(term) || subject.includes(term);
+  });
+}
+
 export { COUNTRY_LABELS };

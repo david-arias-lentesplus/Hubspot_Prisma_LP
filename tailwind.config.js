@@ -8,6 +8,11 @@
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // Modo oscuro por clase (2026-07-09, fase "Enterprise") — la clase
+  // `dark` se aplica a <html> desde `src/hooks/useTheme.js`, no depende
+  // de `prefers-color-scheme` en CSS puro (así el toggle manual del
+  // sidebar puede anular la preferencia del sistema en cualquier momento).
+  darkMode: "class",
   content: [
     "./index.html",
     "./src/**/*.{js,jsx,ts,tsx}",

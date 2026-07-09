@@ -13,6 +13,7 @@
  *   - filterByDateRange: (startDate, endDate) => array
  *   - filterByCountry:   (countryCode) => array
  *   - filterByType:      (campaignType) => array — Marketing/Automatizado/Flujo de trabajo/Todos
+ *   - filterByCommunicationType: (communicationType) => array — Promotional Offer/Account Management/.../Sin clasificar/Todos (2026-07-09)
  *   - getGlobalMetrics:  (dataset?) => { totalSent, avgOpenRate, avgClickRate, avgBounceRate }
  *
  * Los componentes UI (Agente UI/UX) consumen exclusivamente este hook:
@@ -117,6 +118,24 @@ export function useHubspotData() {
   );
 
   /**
+   * Filtra un dataset (por defecto, `data`) por "Clasificación del tipo de
+   * comunicación" de HubSpot (`communicationType` en dataService.js — ej.
+   * "Promotional Offer", "Account Management"...). "TODOS" o falsy devuelve
+   * el dataset completo; `"SIN_CLASIFICAR"` devuelve las filas donde esa
+   * columna viene vacía (mayormente automatizaciones/flujos de trabajo sin
+   * clasificar — 222 de 436 filas en la fuente validada el 2026-07-09, ver
+   * `dataService.js`). No muta el array original.
+   */
+  const filterByCommunicationType = useCallback(
+    (communicationType, dataset = data) => {
+      if (!communicationType || communicationType === "TODOS") return dataset;
+      if (communicationType === "SIN_CLASIFICAR") return dataset.filter((row) => !row.communicationType);
+      return dataset.filter((row) => row.communicationType === communicationType);
+    },
+    [data]
+  );
+
+  /**
    * Calcula métricas globales sobre un dataset (por defecto, `data`):
    * suma de envíos, promedio de tasa de apertura y promedio de tasa de clics.
    * Devuelve ceros si el dataset está vacío (evita NaN / división por cero).
@@ -154,6 +173,7 @@ export function useHubspotData() {
     filterByDateRange,
     filterByCountry,
     filterByType,
+    filterByCommunicationType,
     getGlobalMetrics,
     globalMetrics,
   };

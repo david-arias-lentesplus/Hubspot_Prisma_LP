@@ -28,6 +28,7 @@
  * ------------------------------------------------------------------
  */
 
+import { useMemo } from "react";
 import { buildCampaignInsights } from "../../utils/reportAggregations";
 import { CAMPAIGN_TYPES } from "../../services/dataService";
 import ConversionFunnel from "../metrics/ConversionFunnel";
@@ -81,10 +82,17 @@ function diffPhrase(diff, metricLabel) {
  * @param {() => void} props.onBack
  */
 export default function CampaignDetailView({ campaign, dataset = [], onBack }) {
+  // Memoización estricta (2026-07-09) — el comparativo contra "pares"
+  // filtra `dataset` completo; se llama antes que cualquier return
+  // temprano para respetar las Rules of Hooks (buildCampaignInsights ya
+  // devuelve null internamente si no hay `campaign`, así que es seguro
+  // llamarlo incondicionalmente acá).
+  const insights = useMemo(() => buildCampaignInsights(campaign, dataset), [campaign, dataset]);
+
   if (!campaign) {
     return (
-      <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm">
-        <p className="text-sm text-[#666] mb-4">No se encontró la campaña seleccionada.</p>
+      <div className="bg-white dark:bg-[#1C1C24] rounded-card p-6 border border-livo-gray dark:border-white/10 shadow-sm">
+        <p className="text-sm text-[#666] dark:text-white/60 mb-4">No se encontró la campaña seleccionada.</p>
         <button
           type="button"
           onClick={onBack}
@@ -96,8 +104,6 @@ export default function CampaignDetailView({ campaign, dataset = [], onBack }) {
     );
   }
 
-  const insights = buildCampaignInsights(campaign, dataset);
-
   const analysisLines = [
     diffPhrase(insights?.openRateDiff, "La tasa de apertura"),
     diffPhrase(insights?.clickRateDiff, "La tasa de clics"),
@@ -107,7 +113,7 @@ export default function CampaignDetailView({ campaign, dataset = [], onBack }) {
   return (
     <div className="grid grid-cols-1 gap-6">
       {/* --- Header --- */}
-      <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm">
+      <div className="bg-white dark:bg-[#1C1C24] rounded-card p-6 border border-livo-gray dark:border-white/10 shadow-sm">
         <button
           type="button"
           onClick={onBack}
@@ -118,31 +124,31 @@ export default function CampaignDetailView({ campaign, dataset = [], onBack }) {
 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="font-display font-bold text-xl text-black break-words">
+            <h2 className="font-display font-bold text-xl text-black dark:text-white break-words">
               {campaign.campaignName || "(Sin nombre)"}
             </h2>
-            {campaign.subject && <p className="text-sm text-[#666] mt-1 break-words">{campaign.subject}</p>}
+            {campaign.subject && <p className="text-sm text-[#666] dark:text-white/60 mt-1 break-words">{campaign.subject}</p>}
           </div>
 
           <div className="flex flex-wrap gap-2 shrink-0">
             <span className="inline-flex items-center px-[10px] py-[2px] rounded-badge text-xs font-bold bg-[#E8E8FF] border border-livo-blue-600 text-livo-blue-600">
               {COUNTRY_FLAGS[campaign.country] || "🌐"} {COUNTRY_LABELS[campaign.country] || campaign.country}
             </span>
-            <span className="inline-flex items-center px-[10px] py-[2px] rounded-badge text-xs font-bold bg-livo-gray/70 border border-[#DDD] text-[#111]">
+            <span className="inline-flex items-center px-[10px] py-[2px] rounded-badge text-xs font-bold bg-livo-gray/70 dark:bg-white/10 border border-[#DDD] dark:border-white/20 text-[#111] dark:text-white/90">
               {CAMPAIGN_TYPES[campaign.campaignType] || campaign.campaignType}
             </span>
           </div>
         </div>
 
-        <dl className="flex flex-wrap gap-x-8 gap-y-2 mt-4 text-xs text-[#666]">
+        <dl className="flex flex-wrap gap-x-8 gap-y-2 mt-4 text-xs text-[#666] dark:text-white/60">
           <div>
             <dt className="font-bold tracking-[0.5px] mb-0.5">FECHA DE ENVÍO</dt>
-            <dd className="text-[#111]">{formatDate(campaign.sentDate)}</dd>
+            <dd className="text-[#111] dark:text-white/90">{formatDate(campaign.sentDate)}</dd>
           </div>
           {campaign.senderName && (
             <div>
               <dt className="font-bold tracking-[0.5px] mb-0.5">REMITENTE</dt>
-              <dd className="text-[#111]">
+              <dd className="text-[#111] dark:text-white/90">
                 {campaign.senderName} {campaign.senderAddress && `· ${campaign.senderAddress}`}
               </dd>
             </div>
@@ -150,7 +156,7 @@ export default function CampaignDetailView({ campaign, dataset = [], onBack }) {
           {campaign.campaignId && (
             <div>
               <dt className="font-bold tracking-[0.5px] mb-0.5">ID DE CAMPAÑA</dt>
-              <dd className="font-mono text-[#111]">{campaign.campaignId}</dd>
+              <dd className="font-mono text-[#111] dark:text-white/90">{campaign.campaignId}</dd>
             </div>
           )}
         </dl>
@@ -167,28 +173,28 @@ export default function CampaignDetailView({ campaign, dataset = [], onBack }) {
       />
 
       {/* --- Tasas (compactas: el detalle narrativo vs. pares vive en "Análisis" abajo) --- */}
-      <div className="bg-white rounded-card p-4 border border-livo-gray shadow-sm flex flex-wrap gap-x-8 gap-y-2">
-        <span className="text-sm text-[#666]">
-          Tasa de apertura: <span className="font-mono font-bold text-black">{campaign.openRate.toFixed(1)}%</span>
+      <div className="bg-white dark:bg-[#1C1C24] rounded-card p-4 border border-livo-gray dark:border-white/10 shadow-sm flex flex-wrap gap-x-8 gap-y-2">
+        <span className="text-sm text-[#666] dark:text-white/60">
+          Tasa de apertura: <span className="font-mono font-bold text-black dark:text-white">{campaign.openRate.toFixed(1)}%</span>
         </span>
-        <span className="text-sm text-[#666]">
-          Tasa de clics: <span className="font-mono font-bold text-black">{campaign.clickRate.toFixed(1)}%</span>
+        <span className="text-sm text-[#666] dark:text-white/60">
+          Tasa de clics: <span className="font-mono font-bold text-black dark:text-white">{campaign.clickRate.toFixed(1)}%</span>
         </span>
-        <span className="text-sm text-[#666]">
-          Tasa de rebote: <span className="font-mono font-bold text-black">{campaign.bounceRate.toFixed(1)}%</span>
+        <span className="text-sm text-[#666] dark:text-white/60">
+          Tasa de rebote: <span className="font-mono font-bold text-black dark:text-white">{campaign.bounceRate.toFixed(1)}%</span>
         </span>
       </div>
 
       {/* --- Análisis --- */}
-      <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm">
-        <h3 className="font-display font-bold text-lg text-black mb-3">Análisis</h3>
+      <div className="bg-white dark:bg-[#1C1C24] rounded-card p-6 border border-livo-gray dark:border-white/10 shadow-sm">
+        <h3 className="font-display font-bold text-lg text-black dark:text-white mb-3">Análisis</h3>
         {insights && insights.peerCount > 0 ? (
           <>
-            <p className="text-xs text-[#666] mb-3">
+            <p className="text-xs text-[#666] dark:text-white/60 mb-3">
               Comparado contra {insights.peerCount} campaña{insights.peerCount === 1 ? "" : "s"} de tipo "
               {CAMPAIGN_TYPES[campaign.campaignType] || campaign.campaignType}" dentro del filtro actual.
             </p>
-            <ul className="space-y-1.5 text-sm text-[#111]">
+            <ul className="space-y-1.5 text-sm text-[#111] dark:text-white/90">
               {analysisLines.map((line, i) => (
                 <li key={i} className="flex gap-2">
                   <span className="text-livo-blue-500">•</span>
@@ -198,44 +204,44 @@ export default function CampaignDetailView({ campaign, dataset = [], onBack }) {
             </ul>
           </>
         ) : (
-          <p className="text-sm text-[#666]">
+          <p className="text-sm text-[#666] dark:text-white/60">
             No hay otras campañas del mismo tipo dentro del filtro actual para comparar.
           </p>
         )}
 
-        <div className="flex flex-wrap gap-x-8 gap-y-2 mt-4 pt-4 border-t border-livo-gray text-xs text-[#666]">
+        <div className="flex flex-wrap gap-x-8 gap-y-2 mt-4 pt-4 border-t border-livo-gray dark:border-white/10 text-xs text-[#666] dark:text-white/60">
           <span>
-            Clics: <span className="font-mono font-bold text-black">{campaign.clicksCount.toLocaleString("es-MX")}</span>
+            Clics: <span className="font-mono font-bold text-black dark:text-white">{campaign.clicksCount.toLocaleString("es-MX")}</span>
           </span>
           <span>
-            Aperturas: <span className="font-mono font-bold text-black">{campaign.opensCount.toLocaleString("es-MX")}</span>
+            Aperturas: <span className="font-mono font-bold text-black dark:text-white">{campaign.opensCount.toLocaleString("es-MX")}</span>
           </span>
           <span>
-            Rebotes: <span className="font-mono font-bold text-black">{campaign.bounceCount.toLocaleString("es-MX")}</span>
+            Rebotes: <span className="font-mono font-bold text-black dark:text-white">{campaign.bounceCount.toLocaleString("es-MX")}</span>
           </span>
           <span>
-            Spam: <span className="font-mono font-bold text-black">{campaign.spamCount.toLocaleString("es-MX")}</span>
+            Spam: <span className="font-mono font-bold text-black dark:text-white">{campaign.spamCount.toLocaleString("es-MX")}</span>
           </span>
           <span>
-            Cancelaciones: <span className="font-mono font-bold text-black">{campaign.unsubscribeCount.toLocaleString("es-MX")}</span>
+            Cancelaciones: <span className="font-mono font-bold text-black dark:text-white">{campaign.unsubscribeCount.toLocaleString("es-MX")}</span>
           </span>
         </div>
       </div>
 
       {/* --- Vista previa del correo (Opción A — sin iframe, 2026-07-09) --- */}
-      <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm">
-        <h3 className="font-display font-bold text-lg text-black mb-1">Vista previa del correo</h3>
-        <p className="text-xs text-[#666] mb-4">
+      <div className="bg-white dark:bg-[#1C1C24] rounded-card p-6 border border-livo-gray dark:border-white/10 shadow-sm">
+        <h3 className="font-display font-bold text-lg text-black dark:text-white mb-1">Vista previa del correo</h3>
+        <p className="text-xs text-[#666] dark:text-white/60 mb-4">
           El diseño no se puede embeber directamente en el dashboard — HubSpot bloquea la vista previa dentro de un
           iframe. Usa el botón de abajo para verlo en HubSpot.
         </p>
 
-        <div className="bg-livo-gray/40 rounded-input p-4 mb-5">
-          <p className="text-xs font-bold text-[#666] tracking-[0.5px] mb-1">ASUNTO</p>
-          <p className="text-sm text-[#111] mb-3 break-words">{campaign.subject || "—"}</p>
+        <div className="bg-livo-gray/40 dark:bg-white/5 rounded-input p-4 mb-5">
+          <p className="text-xs font-bold text-[#666] dark:text-white/50 tracking-[0.5px] mb-1">ASUNTO</p>
+          <p className="text-sm text-[#111] dark:text-white/90 mb-3 break-words">{campaign.subject || "—"}</p>
 
-          <p className="text-xs font-bold text-[#666] tracking-[0.5px] mb-1">TEXTO DE VISTA PREVIA</p>
-          <p className="text-sm text-[#111] break-words">{campaign.previewText || "—"}</p>
+          <p className="text-xs font-bold text-[#666] dark:text-white/50 tracking-[0.5px] mb-1">TEXTO DE VISTA PREVIA</p>
+          <p className="text-sm text-[#111] dark:text-white/90 break-words">{campaign.previewText || "—"}</p>
         </div>
 
         {campaign.previewUrl ? (
@@ -250,7 +256,7 @@ export default function CampaignDetailView({ campaign, dataset = [], onBack }) {
             Ver diseño original en HubSpot <ExternalLinkIcon />
           </a>
         ) : (
-          <p className="text-sm text-[#AAA]">Esta campaña no tiene un enlace de vista previa disponible.</p>
+          <p className="text-sm text-[#AAA] dark:text-white/40">Esta campaña no tiene un enlace de vista previa disponible.</p>
         )}
       </div>
     </div>

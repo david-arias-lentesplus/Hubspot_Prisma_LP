@@ -39,6 +39,17 @@
  * control ahora son `sr-only` (accesibles pero no ocupan espacio
  * visual); el `<select>` sigue comunicando el filtro activo mediante su
  * opción seleccionada.
+ *
+ * FILTRO "TIPO DE COMUNICACIÓN" (2026-07-09, fase "Enterprise"): nuevo
+ * selector sobre `communicationType` (columna real de HubSpot
+ * "Clasificación del tipo de comunicación", confirmada con `curl` contra
+ * el CSV en vivo — 436 filas). Los 6 valores de `COMMUNICATION_TYPE_OPTIONS`
+ * son los únicos que existen hoy en la fuente real (no una lista genérica
+ * inventada); "Sin clasificar" cubre las 222 filas con la columna vacía
+ * (mayormente AUTO/WORKFLOW). Si HubSpot agrega una categoría nueva en el
+ * futuro, esas filas seguirán apareciendo en "Todos" pero no tendrán una
+ * opción dedicada en el `<select>` hasta actualizar esta lista — mismo
+ * criterio ya usado en `TYPE_OPTIONS`/`COUNTRY_OPTIONS` de abajo.
  * ------------------------------------------------------------------
  */
 
@@ -60,10 +71,24 @@ const TYPE_OPTIONS = [
   { value: "WORKFLOW", label: "Flujo de trabajo" },
 ];
 
+// Valores alineados con `communicationType` de dataService.js — texto en
+// inglés tal cual lo exporta HubSpot (así el filtro compara sin traducir
+// ida y vuelta); el `label` sí se muestra en español.
+const COMMUNICATION_TYPE_OPTIONS = [
+  { value: "TODOS", label: "Toda comunicación" },
+  { value: "Promotional Offer", label: "Oferta promocional" },
+  { value: "Account Management", label: "Gestión de cuenta" },
+  { value: "Event Invitation or Reminder", label: "Invitación / recordatorio" },
+  { value: "Educational", label: "Educativo" },
+  { value: "Initial Engagement", label: "Primer contacto" },
+  { value: "Feedback", label: "Feedback" },
+  { value: "SIN_CLASIFICAR", label: "Sin clasificar" },
+];
+
 // Clases compartidas — versión compacta de sección 8 (Inputs & Forms) de
 // DESIGN_SYSTEM-LIVO.md, adaptada para vivir en el header (h-9 en vez de h-11).
 const selectClasses =
-  "h-9 w-full pl-2.5 pr-7 bg-white border-[1.5px] border-[#DDD] rounded-input text-xs font-body text-[#111] " +
+  "h-9 w-full pl-2.5 pr-7 bg-white dark:bg-white/5 border-[1.5px] border-[#DDD] dark:border-white/20 rounded-input text-xs font-body text-[#111] dark:text-white " +
   "appearance-none cursor-pointer hover:border-[#AAA] focus:outline-none focus:border-livo-blue-500 " +
   "focus:shadow-focus-input transition-shadow";
 
@@ -86,6 +111,8 @@ function ChevronDownIcon() {
  * @param {(country:string)=>void} props.onCountryChange
  * @param {string} [props.campaignType] - "TODOS" | "MKT" | "AUTO" | "WORKFLOW"
  * @param {(type:string)=>void} [props.onCampaignTypeChange]
+ * @param {string} [props.communicationType] - "TODOS" | "SIN_CLASIFICAR" | uno de COMMUNICATION_TYPE_OPTIONS
+ * @param {(type:string)=>void} [props.onCommunicationTypeChange]
  * @param {string} [props.datePreset] - value de DATE_PRESET_OPTIONS (dateRangePresets.js), default "all"
  * @param {(preset:string)=>void} [props.onDatePresetChange]
  * @param {string} [props.startDate] - yyyy-mm-dd, solo relevante si datePreset === "custom"
@@ -98,6 +125,8 @@ export default function FiltersBar({
   onCountryChange,
   campaignType = "TODOS",
   onCampaignTypeChange,
+  communicationType = "TODOS",
+  onCommunicationTypeChange,
   datePreset = "all",
   onDatePresetChange,
   startDate = "",
@@ -108,6 +137,7 @@ export default function FiltersBar({
   function handleReset() {
     onCountryChange?.("TODOS");
     onCampaignTypeChange?.("TODOS");
+    onCommunicationTypeChange?.("TODOS");
     onDatePresetChange?.("all");
     onStartDateChange?.("");
     onEndDateChange?.("");
@@ -155,6 +185,26 @@ export default function FiltersBar({
         <ChevronDownIcon />
       </div>
 
+      {/* --- Tipo de comunicación (2026-07-09, "Clasificación del tipo de comunicación" de HubSpot) --- */}
+      <div className="relative w-[9.5rem]">
+        <label htmlFor="filters-communication-type" className="sr-only">
+          Tipo de comunicación
+        </label>
+        <select
+          id="filters-communication-type"
+          value={communicationType}
+          onChange={(e) => onCommunicationTypeChange?.(e.target.value)}
+          className={selectClasses}
+        >
+          {COMMUNICATION_TYPE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDownIcon />
+      </div>
+
       {/* --- Rango de fechas (popover: presets + calendario de 2 meses) --- */}
       <DateRangeFilter
         preset={datePreset}
@@ -171,9 +221,9 @@ export default function FiltersBar({
       <button
         type="button"
         onClick={handleReset}
-        className="h-9 px-3 rounded-btn border-[1.5px] border-livo-blue-500 bg-[#F5F5F5] text-livo-blue-500
+        className="h-9 px-3 rounded-btn border-[1.5px] border-livo-blue-500 bg-[#F5F5F5] dark:bg-white/5 text-livo-blue-500 dark:text-livo-blue-300
                    font-bold text-xs tracking-[0.5px] whitespace-nowrap
-                   hover:bg-[#E8E8FF] active:bg-[#D0D0FF]
+                   hover:bg-[#E8E8FF] dark:hover:bg-white/10 active:bg-[#D0D0FF]
                    focus:outline-none focus:shadow-focus-primary transition-colors shrink-0"
       >
         Limpiar filtros

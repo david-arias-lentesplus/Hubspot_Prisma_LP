@@ -19,10 +19,28 @@
  * mostrando más contenido en una sola pantalla. `App.jsx` decide qué
  * vista recibe `headerActions` (Resumen/Campañas/Países la reciben,
  * Configuración y el detalle de campaña no).
+ *
+ * EXPORTAR INFORME A PDF (2026-07-09, fase "Enterprise"): botón fijo en
+ * la esquina superior derecha del header (a la derecha de
+ * `headerActions`, visible en TODAS las vistas). Captura el `<main>`
+ * actual (`mainRef`) con `html2canvas` y arma el PDF con `jsPDF` — la
+ * lógica de armado vive en `src/utils/exportPdf.js` (Agente de Datos),
+ * este componente solo dispara la captura y maneja el estado de carga /
+ * error del botón. Ambas librerías se cargan con `import()` dinámico
+ * dentro de `handleExportPdf`, no en el top-level del archivo, para no
+ * sumarlas al bundle inicial de todos los usuarios (ver el comentario
+ * completo en `exportPdf.js`).
+ *
+ * MODO OSCURO (2026-07-09, fase "Enterprise"): props `isDark`/
+ * `onToggleTheme` (de `useTheme()` en `App.jsx`) — este componente solo
+ * renderiza el botón sol/luna en el sidebar y aplica las clases `dark:`
+ * a su propio shell (fondo, header). El resto de las vistas manejan sus
+ * propias clases `dark:` internamente.
  * ------------------------------------------------------------------
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { exportNodeToPdf } from "../../utils/exportPdf";
 
 // Íconos inline (sin dependencias externas) — trazos simples estilo outline.
 const icons = {
@@ -60,6 +78,54 @@ const icons = {
   ),
 };
 
+function DownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4 shrink-0">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.75}
+        d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+      />
+    </svg>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 shrink-0 animate-spin">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeOpacity="0.25" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4 shrink-0">
+      <circle cx="12" cy="12" r="4" strokeWidth={1.75} />
+      <path
+        strokeLinecap="round"
+        strokeWidth={1.75}
+        d="M12 2.5v2M12 19.5v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2.5 12h2M19.5 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+      />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4 shrink-0">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.75}
+        d="M20.5 14.7A8.5 8.5 0 0 1 9.3 3.5a8.5 8.5 0 1 0 11.2 11.2Z"
+      />
+    </svg>
+  );
+}
+
 const DEFAULT_NAV_ITEMS = [
   { id: "resumen", label: "Resumen", icon: "home" },
   { id: "campanas", label: "Campañas", icon: "campaigns" },
@@ -75,6 +141,8 @@ const DEFAULT_NAV_ITEMS = [
  * @param {string} [props.activeItemId] - id del item activo (controlado desde afuera, opcional)
  * @param {(id:string)=>void} [props.onNavigate] - callback al hacer click en un item del sidebar
  * @param {React.ReactNode} [props.headerActions] - contenido a la derecha del header (ej. FiltersBar compacta)
+ * @param {boolean} [props.isDark] - tema activo (de useTheme() en App.jsx)
+ * @param {() => void} [props.onToggleTheme] - alterna claro/oscuro
  */
 export default function DashboardLayout({
   children,
@@ -83,6 +151,8 @@ export default function DashboardLayout({
   activeItemId,
   onNavigate,
   headerActions,
+  isDark = false,
+  onToggleTheme,
 }) {
   // Si el padre no controla el item activo, el layout mantiene su propio estado interno.
   const [internalActiveId, setInternalActiveId] = useState(navItems[0]?.id);
@@ -93,8 +163,28 @@ export default function DashboardLayout({
     else setInternalActiveId(id);
   }
 
+  // --- Exportar informe a PDF (2026-07-09) ---
+  const mainRef = useRef(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+
+  async function handleExportPdf() {
+    if (!mainRef.current || isExporting) return;
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
+      await exportNodeToPdf(mainRef.current, { html2canvas, JsPDF: jsPDF }, { title });
+    } catch (err) {
+      console.error("No se pudo exportar el informe a PDF:", err);
+      setExportError("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   return (
-    <div className="min-h-screen flex bg-livo-gray font-body">
+    <div className="min-h-screen flex bg-livo-gray dark:bg-[#0B0B0F] font-body">
       {/* ---------- Sidebar ---------- */}
       <aside className="w-64 shrink-0 bg-black text-white flex flex-col">
         <div className="h-16 flex items-center gap-2.5 px-6 border-b border-white/10">
@@ -138,6 +228,20 @@ export default function DashboardLayout({
           })}
         </nav>
 
+        {/* Toggle de modo oscuro (2026-07-09) — estado en memoria, ver useTheme.js */}
+        <div className="px-3 pb-3">
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            aria-pressed={isDark}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-card text-sm font-medium text-white/70
+                       hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus:shadow-focus-primary"
+          >
+            {isDark ? <SunIcon /> : <MoonIcon />}
+            {isDark ? "Modo claro" : "Modo oscuro"}
+          </button>
+        </div>
+
         <div className="px-6 py-4 border-t border-white/10 text-xs text-white/50">
           Lentesplus SAS · Prisma
         </div>
@@ -145,12 +249,29 @@ export default function DashboardLayout({
 
       {/* ---------- Área principal ---------- */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="min-h-16 bg-white border-b border-livo-gray flex items-center justify-between flex-wrap gap-x-4 gap-y-2 px-8 py-2.5 shrink-0">
-          <h1 className="font-display font-bold text-2xl text-black shrink-0">{title}</h1>
-          {headerActions && <div className="shrink-0 ml-auto">{headerActions}</div>}
+        <header className="min-h-16 bg-white dark:bg-[#15151B] border-b border-livo-gray dark:border-white/10 flex items-center justify-between flex-wrap gap-x-4 gap-y-2 px-8 py-2.5 shrink-0">
+          <h1 className="font-display font-bold text-2xl text-black dark:text-white shrink-0">{title}</h1>
+          <div className="flex items-center gap-2 flex-wrap justify-end ml-auto">
+            {headerActions}
+            {exportError && <span className="text-xs text-[#B91C1C] dark:text-red-400">{exportError}</span>}
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              disabled={isExporting}
+              className="h-9 px-3 inline-flex items-center gap-1.5 rounded-btn border-[1.5px] border-livo-blue-500 bg-[#F5F5F5] dark:bg-white/5
+                         text-livo-blue-500 dark:text-livo-blue-300 font-bold text-xs tracking-[0.5px] whitespace-nowrap
+                         hover:bg-[#E8E8FF] dark:hover:bg-white/10 active:bg-[#D0D0FF] disabled:opacity-60 disabled:cursor-not-allowed
+                         focus:outline-none focus:shadow-focus-primary transition-colors shrink-0"
+            >
+              {isExporting ? <SpinnerIcon /> : <DownloadIcon />}
+              {isExporting ? "Generando…" : "Exportar informe"}
+            </button>
+          </div>
         </header>
 
-        <main className="flex-1 p-8 overflow-y-auto">{children}</main>
+        <main ref={mainRef} className="flex-1 p-8 overflow-y-auto bg-livo-gray dark:bg-[#0B0B0F]">
+          {children}
+        </main>
       </div>
     </div>
   );

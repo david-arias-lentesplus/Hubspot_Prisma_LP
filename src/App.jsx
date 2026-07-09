@@ -37,6 +37,15 @@
  * una sola pantalla. Solo se muestra en Resumen, Países y en Campañas
  * cuando no hay una campaña seleccionada (`showFilters`); en
  * Configuración y en el detalle de campaña no aplica.
+ *
+ * MODO OSCURO (2026-07-09, fase "Enterprise"): `useTheme()` vive acá
+ * (nivel más alto con estado) y se pasa por props explícitos —
+ * `isDark`/`onToggleTheme` a `DashboardLayout` (toggle en el sidebar +
+ * clase `dark` en `<html>`) e `isDark` a `ReportsView` (colores de
+ * Recharts, que no pueden usar clases `dark:` de Tailwind porque
+ * Recharts pinta con SVG/inline styles, no con className). Sin
+ * `localStorage` — arranca según `prefers-color-scheme` del sistema en
+ * cada carga, ver `useTheme.js` para el detalle de la decisión.
  * ------------------------------------------------------------------
  */
 
@@ -52,6 +61,7 @@ import CountriesView from "./components/countries/CountriesView";
 import SettingsView from "./components/settings/SettingsView";
 import useHubspotData from "./hooks/useHubspotData";
 import useAdvancedAnalytics from "./hooks/useAdvancedAnalytics";
+import useTheme from "./hooks/useTheme";
 import { HUBSPOT_CSV_URL } from "./services/dataService";
 import { computeDateRangeForPreset } from "./utils/dateRangePresets";
 
@@ -72,12 +82,14 @@ export default function App() {
     refetch,
     filterByCountry,
     filterByType,
+    filterByCommunicationType,
     filterByDateRange,
     getGlobalMetrics,
   } = useHubspotData();
 
   const [view, setView] = useState("resumen");
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
+  const { isDark, toggleTheme } = useTheme();
 
   // Al navegar a otra sección del sidebar, se descarta cualquier detalle
   // de campaña abierto (evita volver a "Campañas" y quedar atrapado en
@@ -89,18 +101,35 @@ export default function App() {
 
   const [country, setCountry] = useState("TODOS");
   const [campaignType, setCampaignType] = useState("TODOS");
+  const [communicationType, setCommunicationType] = useState("TODOS");
   const [datePreset, setDatePreset] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
   const { start, end } = computeDateRangeForPreset(datePreset, startDate, endDate);
 
-  // Dataset derivado: fecha → país → tipo de envío. No muta `data`.
+  // Dataset derivado: fecha → país → tipo de envío → tipo de comunicación.
+  // No muta `data`. Memoizado: React solo recalcula esta cadena de filtros
+  // cuando `data` o alguno de los filtros cambia — escribir en el buscador
+  // de Campañas (estado local de esa vista, ver CampaignsView.jsx) o
+  // cambiar de página NO dispara este cálculo de nuevo.
   const filteredData = useMemo(() => {
     const byDate = filterByDateRange(start, end);
     const byCountry = filterByCountry(country, byDate);
-    return filterByType(campaignType, byCountry);
-  }, [data, country, campaignType, start, end, filterByDateRange, filterByCountry, filterByType]);
+    const byType = filterByType(campaignType, byCountry);
+    return filterByCommunicationType(communicationType, byType);
+  }, [
+    data,
+    country,
+    campaignType,
+    communicationType,
+    start,
+    end,
+    filterByDateRange,
+    filterByCountry,
+    filterByType,
+    filterByCommunicationType,
+  ]);
 
   const metrics = useMemo(() => getGlobalMetrics(filteredData), [filteredData, getGlobalMetrics]);
 
@@ -123,6 +152,8 @@ export default function App() {
       onCountryChange={setCountry}
       campaignType={campaignType}
       onCampaignTypeChange={setCampaignType}
+      communicationType={communicationType}
+      onCommunicationTypeChange={setCommunicationType}
       datePreset={datePreset}
       onDatePresetChange={setDatePreset}
       startDate={startDate}
@@ -143,13 +174,15 @@ export default function App() {
       activeItemId={view}
       onNavigate={handleNavigate}
       headerActions={showFilters ? filtersBar : null}
+      isDark={isDark}
+      onToggleTheme={toggleTheme}
     >
       {view === "resumen" && (
         <>
           <div className="mb-6 sm:mb-8">
             <DashboardSummary metrics={metrics} loading={loading} error={error} />
           </div>
-          <ReportsView data={filteredData} loading={loading} error={error} />
+          <ReportsView data={filteredData} loading={loading} error={error} isDark={isDark} />
           <div className="mt-6 sm:mt-8">
             <AdvancedInsights {...advancedAnalytics} loading={loading} error={error} />
           </div>

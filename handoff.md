@@ -1,7 +1,7 @@
 # HANDOFF — Dashboard de HubSpot (Lentesplus)
 
 > Fuente de la verdad del proyecto. Se actualiza cada vez que se hace un cambio importante en la arquitectura, se agrega una nueva librería, o se resuelve un bug complejo ("Actualiza el handoff").
-> Owner: David · Última actualización: 2026-07-09 (analítica avanzada: Insight del Asunto, Salud del dominio, Mejor horario de envío; embudo de conversión reemplaza las tarjetas de KPI de campaña; iframe de vista previa eliminado — reemplazado por tarjeta + botón a HubSpot; toggle Día/Semana/Mes en tendencia; tooltips de valor absoluto en tablas; `FiltersBar` movida al header — título a la izquierda, filtros a la derecha, mismo alto de fila)
+> Owner: David · Última actualización: 2026-07-09 (**Fase Enterprise**: filtro Tipo de comunicación, benchmarks semafóricos, rendimiento por palabras clave, buscador + paginación en Campañas, exportación a PDF, modo oscuro completo — ver sección 3 "Fase Enterprise" y sección 10)
 
 ---
 
@@ -62,31 +62,35 @@ mails hubspot lentesplus/
     ├── services/
     │   └── dataService.js               # fetch + PapaParse + normalización + país + campaignId/previewUrl/subject/previewText/hasEmoji + tasas de deliverability
     ├── hooks/
-    │   ├── useHubspotData.js            # data, loading, error, filtros, KPIs globales
-    │   └── useAdvancedAnalytics.js      # NUEVO — memoiza buildEmojiInsight/buildDeliverabilityHealth/buildBestSendTime sobre el dataset filtrado
+    │   ├── useHubspotData.js            # data, loading, error, filtros (país/tipo/fecha/tipo de comunicación NUEVO), KPIs globales
+    │   ├── useAdvancedAnalytics.js      # memoiza buildEmojiInsight/buildDeliverabilityHealth/buildBestSendTime/buildKeywordPerformance (NUEVO) sobre el dataset filtrado
+    │   └── useTheme.js                  # NUEVO (Fase Enterprise) — estado isDark + toggleTheme; aplica/quita clase `dark` en <html>; SIN localStorage (detecta prefers-color-scheme al montar, no persiste)
     ├── utils/
-    │   ├── reportAggregations.js        # agregaciones puras: tendencia (con granularidad día/semana/mes), país (volumen), país (métricas + sumas absolutas), top 5, insights de campaña
-    │   ├── advancedAnalytics.js         # NUEVO — funciones puras: buildEmojiInsight, buildDeliverabilityHealth (+ alertas), buildBestSendTime (+ heatmap)
-    │   └── dateRangePresets.js          # cálculo de rangos (Ayer/7d/28d/90d/semana/mes/año/personalizado) + grilla de calendario
+    │   ├── reportAggregations.js        # agregaciones puras: tendencia (día/semana/mes), país (volumen/métricas), top 5, insights de campaña, filterCampaignsBySearch (NUEVO, Fase Enterprise)
+    │   ├── advancedAnalytics.js         # funciones puras: buildEmojiInsight, buildDeliverabilityHealth, buildBestSendTime, buildKeywordPerformance (NUEVO, Fase Enterprise — extrae keywords del Asunto en campañas top de apertura)
+    │   ├── dateRangePresets.js          # cálculo de rangos (Ayer/7d/28d/90d/semana/mes/año/personalizado) + grilla de calendario
+    │   ├── benchmarks.js                # NUEVO (Fase Enterprise) — INDUSTRY_BENCHMARKS (apertura 20%/clics 2%) + getBenchmarkStatus() → semáforo success/warning/danger
+    │   ├── pagination.js                # NUEVO (Fase Enterprise) — paginate(items, page, pageSize) en memoria, DEFAULT_PAGE_SIZE=15, sin localStorage
+    │   └── exportPdf.js                 # NUEVO (Fase Enterprise) — exportNodeToPdf(): html2canvas + jsPDF, captura un nodo DOM y genera PDF multi-página A4
     └── components/
         ├── layout/
-        │   └── DashboardLayout.jsx      # Sidebar (logo Prisma/Lentesplus) + área principal + navegación real; header con `headerActions` (título izq., filtros der., 2026-07-09)
+        │   └── DashboardLayout.jsx      # Sidebar (logo Prisma/Lentesplus) + área principal + navegación real; header con `headerActions` (título izq., filtros der.); botón "Exportar informe" (PDF) + toggle sol/luna (dark mode) — ambos NUEVOS Fase Enterprise
         ├── metrics/
-        │   ├── MetricCard.jsx           # card de KPI (título/valor/crecimiento) — con hover:shadow-md
-        │   ├── DashboardSummary.jsx     # grid de 4 MetricCard + estados loading/error
-        │   └── ConversionFunnel.jsx     # NUEVO — embudo Enviados→Entregados→Aperturas→Clics, usado en CampaignDetailView
+        │   ├── MetricCard.jsx           # card de KPI — NUEVO prop `benchmark` → punto semafórico (BenchmarkDot) con Tooltip, Fase Enterprise
+        │   ├── DashboardSummary.jsx     # grid de 4 MetricCard + estados loading/error; pasa `benchmark` a apertura/clics (Fase Enterprise)
+        │   └── ConversionFunnel.jsx     # embudo Enviados→Entregados→Aperturas→Clics, usado en CampaignDetailView
         ├── common/
-        │   └── Tooltip.jsx              # NUEVO — tooltip reutilizable 100% CSS (Tailwind group-hover), sin librerías
+        │   └── Tooltip.jsx              # tooltip reutilizable 100% CSS (Tailwind group-hover), sin librerías
         ├── insights/
-        │   └── AdvancedInsights.jsx     # NUEVO — compone Insight del Asunto + Salud del dominio + Mejor horario, vista "Resumen"
+        │   └── AdvancedInsights.jsx     # compone Insight del Asunto + Salud del dominio + Mejor horario + Rendimiento por palabras clave (KeywordPerformanceCard, NUEVO Fase Enterprise) — grid 4 columnas
         ├── filters/
-        │   ├── FiltersBar.jsx           # fila compacta de filtros (país + tipo de envío + rango de fechas + limpiar) — vive en `headerActions` del header, ya no en `<main>` (2026-07-09)
-        │   ├── DateRangeFilter.jsx      # popover de fechas estilo Google Analytics (presets + calendario 2 meses); props `compact`/`align="right"` (2026-07-09) para encajar en el header
+        │   ├── FiltersBar.jsx           # fila compacta de filtros: país + tipo de envío + **tipo de comunicación (NUEVO)** + rango de fechas + limpiar — vive en `headerActions` del header
+        │   ├── DateRangeFilter.jsx      # popover de fechas estilo Google Analytics (presets + calendario 2 meses); props `compact`/`align="right"` para encajar en el header
         │   └── Filters.jsx              # ⚠️ LEGACY — sustituido por FiltersBar.jsx (ver sección 8)
         ├── reports/
-        │   └── ReportsView.jsx          # vista "Resumen": LineChart (con toggle Día/Semana/Mes) + BarChart (recharts) + tabla Top 5
+        │   └── ReportsView.jsx          # vista "Resumen": LineChart (toggle Día/Semana/Mes) + BarChart (recharts) + tabla Top 5; **paleta de charts theme-aware (dark mode, NUEVO Fase Enterprise)** vía prop `isDark`
         ├── campaigns/
-        │   ├── CampaignsView.jsx        # vista "Campañas": tabla completa del dataset filtrado, filas clickeables, tooltips de valor absoluto
+        │   ├── CampaignsView.jsx        # vista "Campañas": **buscador (Asunto/Nombre) + paginación 15/página (NUEVO Fase Enterprise)**, tooltips de valor absoluto
         │   └── CampaignDetailView.jsx   # detalle de 1 campaña: ConversionFunnel + análisis comparativo vs. pares + tarjeta de vista previa (SIN iframe, ver sección 4)
         ├── countries/
         │   └── CountriesView.jsx        # vista "Países": tarjetas + tabla comparativa por país, tooltips de valor absoluto
@@ -186,20 +190,35 @@ Pedido explícito de David: liberar espacio vertical mostrando más contenido en
 - [x] `App.jsx` — se eliminó el render de `{filtersBar}` dentro de `<main>` en Resumen/Campañas/Países; ahora se calcula `showFilters` (`true` en Resumen y Países, y en Campañas solo si no hay `selectedCampaignId`) y `filtersBar` se pasa como `headerActions` a `DashboardLayout`. En Configuración y en el detalle de campaña `headerActions` es `null` — el header solo muestra el título.
 - [x] Verificado con `npm run build` (850 módulos, sin errores) y en el navegador real (Claude in Chrome): las 4 vistas muestran el título a la izquierda y los filtros compactos a la derecha en la misma fila; el popover de `DateRangeFilter` abre alineado a la derecha sin desbordar el viewport; Configuración y el detalle de campaña muestran el header sin filtros, como se esperaba; Resumen y Países ahora muestran más contenido "above the fold" (en Resumen se alcanza a ver el KPI grid completo + la gráfica de tendencia sin scroll; en Países se alcanza a ver la tabla comparativa completa).
 
+**Fase Enterprise (2026-07-09) — Agente de Datos, UI/UX y Performance:**
+
+Pedido explícito de David: llevar el dashboard a nivel "Enterprise" con profundidad analítica, herramientas de exportación y optimización de rendimiento para miles de correos sin saturar el navegador (**decisión explícita: NO usar `localStorage` para la data cruda**, extendida por consistencia a paginación y tema oscuro — ver sección 5.2).
+
+- [x] **Agente de Datos — filtro "Tipo de comunicación"**: `dataService.js` agrega `communicationType` (columna `"Clasificación del tipo de comunicación"`, valores reales confirmados sobre las 436 filas vía `curl`+Python antes de codificar: Promotional Offer 163, Account Management 30, Event Invitation or Reminder 10, Educational 9, Initial Engagement 1, Feedback 1, 222 filas en blanco). `useHubspotData.js` agrega `filterByCommunicationType(communicationType, dataset?)` con manejo explícito de `"SIN_CLASIFICAR"` para las filas en blanco. `FiltersBar.jsx` agrega el `<select>` correspondiente (`COMMUNICATION_TYPE_OPTIONS`, con etiquetas en español) y lo suma a `handleReset()`. `App.jsx` conecta el nuevo estado a la cadena de `filteredData`.
+- [x] **Agente de Datos — Benchmarks semafóricos**: `src/utils/benchmarks.js` (nuevo) define `INDUSTRY_BENCHMARKS` (Tasa de apertura 20%, Tasa de clics 2%, umbrales pedidos explícitamente por David) y `getBenchmarkStatus(metricKey, value)`, que devuelve `success` (≥ benchmark), `warning` (≥ 75% del benchmark) o `danger` (< 75%). `MetricCard.jsx` agrega el subcomponente `BenchmarkDot` (punto de color junto al título, con `Tooltip` mostrando el estado y la meta) y un nuevo prop `benchmark`. `DashboardSummary.jsx` calcula `getBenchmarkStatus("openRate", avgOpenRate)` y `getBenchmarkStatus("clickRate", avgClickRate)` y los pasa a las cards correspondientes. Verificado en navegador real: puntos verdes con 37.3% apertura (≥20%) y 4.8% clics (≥2%).
+- [x] **Agente de Datos — Rendimiento por palabras clave**: `buildKeywordPerformance(data)` en `advancedAnalytics.js` — tokeniza la columna `"Asunto"` (regex de separadores + limpieza de emoji Unicode), filtra ~120 stop words en español (`SPANISH_STOP_WORDS`), toma el 30% de campañas con mayor `openRate`, cuenta ocurrencias únicas por email y devuelve las 5 palabras más repetidas con su tasa de apertura promedio. Memoizado en `useAdvancedAnalytics.js`. Nuevo componente `KeywordPerformanceCard` en `AdvancedInsights.jsx` (grid pasó de 3 a 4 columnas). Verificado con datos reales: "contact" (55 correos), "pedido" (47), "hub" (31), "customer" (31), "personaliz..." (27).
+- [x] **UI/UX — Buscador + paginación en Campañas**: `src/utils/pagination.js` (nuevo) — `paginate(items, page, pageSize)` en memoria, `DEFAULT_PAGE_SIZE = 15`. `filterCampaignsBySearch(data, searchTerm)` (nuevo, `reportAggregations.js`) — substring case-insensitive contra `campaignName`/`subject`. `CampaignsView.jsx` reescrito: `SearchBar` (ícono + input controlado) + `PaginationControls` (Anterior/Siguiente + "Página X de Y"), estado local `searchTerm`/`currentPage`, `useEffect` que resetea a página 1 al cambiar de búsqueda o dataset. Verificado en navegador real: buscar "liquidos" filtra a 19 resultados → "Página 1 de 2" (15 filas) / "Página 2 de 2" (4 filas), botones Anterior/Siguiente se deshabilitan correctamente en los bordes.
+- [x] **UI/UX — Exportación a PDF**: `npm install jspdf html2canvas --save`. `src/utils/exportPdf.js` (nuevo) — `exportNodeToPdf(node, {html2canvas, JsPDF}, {title, backgroundColor})`: captura el nodo con `html2canvas` (scale 2, `useCORS: true`), corta el canvas resultante en páginas A4 y arma el PDF con `jsPDF`, descarga como `prisma-informe-{slug}-{fecha}.pdf`. Botón "Exportar informe" agregado en el header de `DashboardLayout.jsx` (visible en todas las vistas), con estado de carga (spinner) y manejo de error. **Ambas librerías se cargan con `import()` dinámico dentro del handler del botón** — no se agregan al bundle inicial (ver sección 5.2 para el razonamiento y los números de build).
+- [x] **UI/UX — Modo oscuro**: `tailwind.config.js` agrega `darkMode: "class"`. `src/hooks/useTheme.js` (nuevo) — detecta `prefers-color-scheme: dark` al montar como estado inicial, aplica/quita la clase `dark` en `document.documentElement` vía `useEffect`, **sin `localStorage`** (decisión explícita, ver sección 5.2). Toggle sol/luna agregado en el sidebar de `DashboardLayout.jsx`. Retrofit de clases `dark:` aplicado a los 11 componentes de presentación (bulk find/replace literal, no regex, ver sección 4 para los 2 casos que quedaron fuera del script y se corrigieron a mano). `ReportsView.jsx` recibe `isDark` y usa una paleta de colores hex separada (`CHART_COLORS.light`/`.dark`) para grid/ejes/tooltip/leyenda de Recharts, porque Recharts renderiza SVG y no puede usar clases `dark:` de Tailwind. Verificado en navegador real: toggle bidireccional, estado de filtros/búsqueda/página preservado al cambiar de tema, detección automática correcta del tema del sistema al cargar.
+- [x] **Performance — Memoización estricta**: se revisaron y envolvieron en `useMemo` todos los cálculos pesados que antes se recalculaban en cada render — `buildCountryMetrics()` en `CountriesView.jsx`, `buildCampaignInsights()` en `CampaignDetailView.jsx`, las series de `ReportsView.jsx` (`trendSeries`/`countryVolume`/`topCampaigns`), y la cadena búsqueda→filtro→paginación de `CampaignsView.jsx`. El fetch del CSV sigue ocurriendo solo al montar (`useHubspotData`) o vía el botón "Refrescar datos" de Configuración — nunca se re-dispara al escribir en el buscador o cambiar de página. **Bug encontrado y corregido durante esta revisión**: los `useMemo` de `ReportsView.jsx` y `CountriesView.jsx` se habían colocado después de un `return` condicional (`if (error)`/`if (loading)`), violando las Rules of Hooks y causando pantalla en blanco ("Rendered more hooks than during the previous render"); se movieron al inicio de cada función, antes de cualquier `return`. Diagnosticado con `read_console_messages` sobre el navegador real, re-verificado con captura de pantalla limpia.
+- [x] Verificado en navegador real (Claude in Chrome) tras el retrofit de dark mode: vistas Resumen y Campañas (búsqueda, paginación, toggle claro/oscuro, puntos de benchmark, tarjeta de keywords, botón de exportar PDF), y adicionalmente **Configuración y el detalle de una campaña** (`CampaignDetailView`) confirmados sin fugas de estilos claros en modo oscuro. Consola sin errores tras una navegación fresca.
+
 ### Falta
 
 - [ ] Estados visuales `LoadingState` / `ErrorState` genéricos y reutilizables (hoy cada componente nuevo implementa su propio skeleton/error inline; conviene extraerlos)
 - [ ] Retirar `Filters.jsx` (legacy) una vez se confirme que ninguna vista lo necesita
 - [ ] Cálculo real de `growth` (variación vs. período anterior) para `DashboardSummary` — hoy el prop existe pero nadie lo calcula todavía
-- [ ] Tests para servicios de datos y agregaciones (parseo, filtros, cálculo de KPIs, `reportAggregations.js`, `dateRangePresets.js`)
-- [ ] Code-splitting / `manualChunks` — Vite advierte que el bundle JS (~586 kB) supera los 500 kB recomendados; no bloquea el desarrollo pero conviene revisarlo antes de producción
+- [ ] Tests para servicios de datos y agregaciones (parseo, filtros, cálculo de KPIs, `reportAggregations.js`, `dateRangePresets.js`, `advancedAnalytics.js`, `benchmarks.js`, `pagination.js`)
+- [ ] Code-splitting / `manualChunks` para el bundle principal — Vite advierte que el chunk JS (~629 kB, sin contar jspdf/html2canvas que ya están correctamente separados) supera los 500 kB recomendados; no bloquea el desarrollo pero conviene revisarlo antes de producción
 - [ ] `DateRangeFilter.jsx`: el popover en mobile podría afinarse más (hoy se ve pero es angosto con 2 meses lado a lado en pantallas muy chicas); considerar mostrar 1 solo mes en `sm` como ya hace parcialmente
-- [ ] `FiltersBar` en el header (2026-07-09): falta verificar explícitamente en viewport móvil real (hoy solo se verificó desktop) que el `flex-wrap` del header de `DashboardLayout.jsx` no genere un salto de línea feo entre el título y los filtros en pantallas angostas; candidato a mover a un patrón de "filtros colapsables" (ícono + drawer) en mobile si el wrap actual no se ve bien
-- [ ] **Mejorar la vista previa del correo con la URL pública real (`info.lentesplus.com`), no reconstruida** — la forma correcta de hacer esto es agregar la URL pública como columna del export de HubSpot (o vía su API con un backend), NO adivinándola desde el Asunto — ver sección 4 para por qué se descartó la reconstrucción. Con la Opción A ya implementada (tarjeta + botón, sin iframe) esto ya no es urgente, pero seguiría siendo una mejora si la URL se vuelve exportable.
-- [ ] Tests para `advancedAnalytics.js` (`buildEmojiInsight`, `buildDeliverabilityHealth`, `buildBestSendTime`) — mismo pendiente que el resto de la capa de datos, ver ítem de tests más abajo
-- [ ] Tooltips de valor absoluto (`Tooltip.jsx`) en la tabla "Top 5 campañas" de `ReportsView.jsx` — quedó fuera del alcance explícito del pedido ("las tablas (Campañas y Comparativo por país)"), pero sería consistente agregarlos ahí también
-- [ ] Mapa de calor de "Mejor horario de envío" (`AdvancedInsights.jsx`): es básico a propósito (celdas de 12px, sin zoom/interacción); si se vuelve un feature importante, vale la pena revisar una librería de heatmap dedicada o mejorar la accesibilidad (hoy el detalle de cada celda solo está en el atributo `title` nativo del navegador)
-- [ ] `buildBestSendTime()` no hace ninguna conversión de zona horaria — usa la hora tal cual viene en `"Fecha de envío (tu zona horaria)"` (ya la zona horaria configurada en HubSpot). Si en el futuro se necesita comparar entre países con zonas horarias distintas, esto habría que revisarlo.
+- [ ] `FiltersBar` en el header: falta verificar explícitamente en viewport móvil real (hoy solo se verificó desktop) que el `flex-wrap` del header de `DashboardLayout.jsx` no genere un salto de línea feo entre el título y los filtros en pantallas angostas; candidato a mover a un patrón de "filtros colapsables" (ícono + drawer) en mobile si el wrap actual no se ve bien
+- [ ] **Mejorar la vista previa del correo con la URL pública real (`info.lentesplus.com`), no reconstruida** — la forma correcta de hacer esto es agregar la URL pública como columna del export de HubSpot (o vía su API con un backend), NO adivinándola desde el Asunto — ver sección 4 para por qué se descartó la reconstrucción.
+- [ ] Tooltips de valor absoluto (`Tooltip.jsx`) en la tabla "Top 5 campañas" de `ReportsView.jsx` — quedó fuera del alcance explícito del pedido original, pero sería consistente agregarlos ahí también
+- [ ] Mapa de calor de "Mejor horario de envío" (`AdvancedInsights.jsx`): es básico a propósito (celdas de 12px, sin zoom/interacción); si se vuelve un feature importante, vale la pena revisar una librería de heatmap dedicada
+- [ ] `buildBestSendTime()` no hace ninguna conversión de zona horaria — usa la hora tal cual viene en `"Fecha de envío (tu zona horaria)"`. Si en el futuro se necesita comparar entre países con zonas horarias distintas, esto habría que revisarlo.
+- [ ] El PDF exportado no se abrió/inspeccionó manualmente para confirmar el renderizado multi-página exacto (el botón se probó end-to-end y vuelve a estado idle sin errores en consola, pero falta abrir el archivo descargado y revisar que el corte entre páginas A4 no corte contenido a la mitad de una fila/gráfico)
+- [ ] El `<select>` nativo de `FiltersBar.jsx` no se revisó específicamente en su estado "abierto" en modo oscuro (el dropdown lo pinta el sistema operativo, no CSS de la app — probablemente ya se ve bien, pero no se verificó explícitamente)
+- [ ] Evaluar si el benchmark de "Tasa de rebote" (hoy sin semáforo, solo apertura/clics tienen benchmark) debería agregarse — quedó fuera del pedido explícito de David, que mencionó solo apertura (20%) y clics (2%)
 
 ---
 
@@ -231,15 +250,19 @@ Pedido explícito de David: liberar espacio vertical mostrando más contenido en
 | `react` | Componentes funcionales + Hooks |
 | `tailwindcss` | Estilos, vía `tailwind.config.js` con tokens LIVO |
 | `papaparse` | Parseo del CSV de HubSpot a JSON |
-| `recharts` | Gráficos — **implementado** en `ReportsView.jsx` (`LineChart`, `BarChart`) desde 2026-07-09 |
+| `recharts` | Gráficos — implementado en `ReportsView.jsx` (`LineChart`, `BarChart`) |
+| `jspdf` | **NUEVO (Fase Enterprise, 2026-07-09)** — genera el PDF multi-página del botón "Exportar informe". Cargado con `import()` dinámico, no vive en el bundle inicial (ver sección 5.2) |
+| `html2canvas` | **NUEVO (Fase Enterprise, 2026-07-09)** — captura el nodo DOM del dashboard como canvas antes de pasarlo a `jspdf`. Mismo criterio de carga dinámica que `jspdf` |
 
-**Decisión explícita (2026-07-09): NO se agregó ninguna librería de tooltips.** El pedido de "tooltips de valores absolutos" en las tablas se evaluó contra Radix UI / Headless UI, pero se resolvió con `src/components/common/Tooltip.jsx` — CSS puro (Tailwind `group`/`group-hover`), cero dependencias nuevas, siguiendo la preferencia explícita de David ("se prefiere CSS puro con Tailwind group-hover si es posible"). Este archivo sigue teniendo exactamente las mismas 4 dependencias de producción desde que se hizo el scaffold formal.
+**Decisión explícita (2026-07-09): NO se agregó ninguna librería de tooltips.** El pedido de "tooltips de valores absolutos" en las tablas se evaluó contra Radix UI / Headless UI, pero se resolvió con `src/components/common/Tooltip.jsx` — CSS puro (Tailwind `group`/`group-hover`), cero dependencias nuevas, siguiendo la preferencia explícita de David ("se prefiere CSS puro con Tailwind group-hover si es posible").
+
+**Decisión explícita (2026-07-09, Fase Enterprise): NO se agregó ninguna librería de paginación/tablas (react-table, etc.) ni de temas (next-themes, etc.).** Paginación resuelta con una función pura de ~15 líneas (`pagination.js`); dark mode resuelto con la config nativa `darkMode: "class"` de Tailwind + un hook de ~20 líneas (`useTheme.js`). Ver sección 5.2 para el razonamiento completo de la decisión de paginación + `useMemo` en vez de `localStorage`.
 
 ---
 
 ## 5.1 ARQUITECTURA DEL ESTADO DE DATOS UNIFICADO
 
-Stack: **React (Hooks) + Tailwind CSS + PapaParse + Recharts**, sin librería de estado global (Redux/Zustand) y sin librería de tooltips/overlays (Radix UI / Headless UI evaluadas y descartadas, ver sección 5) — el estado vive en el árbol de componentes vía Hooks nativos. Flujo de datos de una sola vía (unidireccional). Actualizado 2026-07-09 para incorporar el segundo hook de datos (`useAdvancedAnalytics`) que se sumó a `useHubspotData`:
+Stack: **React (Hooks) + Tailwind CSS + PapaParse + Recharts**, sin librería de estado global (Redux/Zustand), sin librería de tooltips/overlays, sin librería de paginación ni de temas (todas evaluadas y descartadas, ver sección 5) — el estado vive en el árbol de componentes vía Hooks nativos. Flujo de datos de una sola vía (unidireccional). Actualizado 2026-07-09 (Fase Enterprise) para incorporar `filterByCommunicationType`, `useTheme` y el estado local de búsqueda/paginación de `CampaignsView`:
 
 ```
 dataService.js (fetch + PapaParse + normalización)
@@ -248,44 +271,57 @@ dataService.js (fetch + PapaParse + normalización)
 useHubspotData()  ← única fuente de verdad del dataset completo
         │  data, loading, error
         │  filterByCountry(code, dataset?) · filterByType(type, dataset?) · filterByDateRange(start, end, dataset?)
+        │  filterByCommunicationType(type, dataset?)  ← NUEVO (Fase Enterprise)
         │  getGlobalMetrics(dataset?) / globalMetrics · refetch() · lastFetchedAt
         ▼
 App.jsx (página contenedora)
    ├── estado local: view ("resumen"|"campanas"|"paises"|"configuracion")
    ├── estado local: selectedCampaignId (detalle de campaña dentro de "campanas")
-   ├── estado local: country, campaignType, datePreset, startDate, endDate
-   ├── filteredData = filterByType(filterByCountry(filterByDateRange(data)))
+   ├── estado local: country, campaignType, communicationType (NUEVO), datePreset, startDate, endDate
+   ├── filteredData = filterByCommunicationType(filterByType(filterByCountry(filterByDateRange(data))))
    ├── selectedCampaign = data.find(campaignId)  ← sobre `data` completo, no filteredData (ver sección 3)
-   ├── advancedAnalytics = useAdvancedAnalytics(filteredData)  ← NUEVO (2026-07-09), memoizado sobre el mismo filteredData
+   ├── advancedAnalytics = useAdvancedAnalytics(filteredData)  ← incluye keywordPerformance (NUEVO)
+   ├── { isDark, toggleTheme } = useTheme()  ← NUEVO (Fase Enterprise), estado de tema, sin localStorage
    │
-   ├─▶ DashboardLayout   (activeItemId=view, onNavigate=handleNavigate) ← navegación real + limpia selectedCampaignId
-   ├─▶ FiltersBar        (country, campaignType, datePreset, startDate, endDate + callbacks) — en resumen/campañas/países
+   ├─▶ DashboardLayout   (activeItemId=view, onNavigate=handleNavigate, isDark, onToggleTheme, headerActions) ← navegación + botón Exportar PDF + toggle de tema
+   ├─▶ FiltersBar        (country, campaignType, communicationType (NUEVO), datePreset, startDate, endDate + callbacks) — en resumen/campañas/países
    ├─▶ view "resumen":
-   │     ├─▶ DashboardSummary   (metrics = getGlobalMetrics(filteredData))
-   │     ├─▶ ReportsView        (data = filteredData) — granularidad día/semana/mes es estado LOCAL del componente
-   │     └─▶ AdvancedInsights   ({...advancedAnalytics}) — NUEVO, puramente presentación de lo que ya calculó el hook
+   │     ├─▶ DashboardSummary   (metrics = getGlobalMetrics(filteredData)) — benchmark por card (NUEVO)
+   │     ├─▶ ReportsView        (data = filteredData, isDark) — granularidad día/semana/mes es estado LOCAL; paleta de charts theme-aware (NUEVO)
+   │     └─▶ AdvancedInsights   ({...advancedAnalytics}) — incluye KeywordPerformanceCard (NUEVO)
    ├─▶ view "campanas":
-   │     ├─▶ CampaignsView      (data = filteredData) — sin selectedCampaignId
+   │     ├─▶ CampaignsView      (data = filteredData) — estado LOCAL: searchTerm, currentPage (NUEVO, no sube a App.jsx)
    │     └─▶ CampaignDetailView (campaign = selectedCampaign, dataset = filteredData) — con selectedCampaignId
    ├─▶ view "paises":        CountriesView (data = filteredData)
    └─▶ view "configuracion": SettingsView (csvUrl, sheetName, sheetUrl, rowCount, lastFetchedAt, onRefetch=refetch)
                 │
                 ▼
-        reportAggregations.js                              advancedAnalytics.js (NUEVO)
-          buildTrendSeries(data, granularity)                 buildEmojiInsight(data)
-          buildCountryVolume · buildCountryMetrics            buildDeliverabilityHealth(data)
-          getTopCampaigns · buildCampaignInsights              buildBestSendTime(data)
-        (agregación pura, sin estado — ambos archivos)
+        reportAggregations.js                    advancedAnalytics.js              benchmarks.js / pagination.js (NUEVOS)
+          buildTrendSeries(data, granularity)       buildEmojiInsight(data)            getBenchmarkStatus(metricKey, value)
+          buildCountryVolume · buildCountryMetrics  buildDeliverabilityHealth(data)    paginate(items, page, pageSize)
+          getTopCampaigns · buildCampaignInsights   buildBestSendTime(data)
+          filterCampaignsBySearch(data, term) NUEVO buildKeywordPerformance(data) NUEVO
+        (agregación / utilidades puras, sin estado — los 4 archivos)
 ```
 
 Reglas clave:
 - **Ningún componente de UI hace `fetch` ni usa PapaParse directamente** — todo pasa por `dataService.js` → `useHubspotData.js`.
-- **Ningún componente de UI agrega datos "a mano"** para los charts/tablas/insights — toda agregación (por fecha, por país, top N, insights avanzados) vive en `reportAggregations.js` / `advancedAnalytics.js`, funciones puras y testeables por separado.
-- `useAdvancedAnalytics` sigue el mismo contrato que `useHubspotData`: recibe el dataset como parámetro (no filtra, no hace fetch) y solo memoiza (`useMemo`) sobre las funciones puras — es un hook "de presentación de agregados", no una segunda fuente de verdad. Vive separado de `useHubspotData` a propósito: responde preguntas analíticas distintas (insights de contenido / salud del dominio / mejor horario) en vez de reportes descriptivos, y así ninguno de los dos hooks crece indefinidamente.
-- Los filtros (país / tipo de envío / rango de fechas) y la navegación (`view`, `selectedCampaignId`) son **estado de `App.jsx`**, no de `useHubspotData` ni de `FiltersBar`/`DashboardLayout`/`CampaignsView` — estos solo reportan cambios vía callbacks (`onCountryChange`, `onDatePresetChange`, `onNavigate`, `onSelectCampaign`), siguiendo el patrón "componente controlado".
-- Excepción deliberada: la granularidad del `LineChart` de tendencia (Día/Semana/Mes) es estado **local** de `ReportsView.jsx`, no de `App.jsx` — no filtra `data`, solo cambia cómo se agrupan los mismos puntos, así que no necesita vivir "arriba" en el árbol.
-- Todo componente que consume datos derivados (`DashboardSummary`, `ReportsView`, `AdvancedInsights`, `CampaignsView`, `CountriesView`) acepta `loading` y `error` como props explícitas y maneja su propio estado visual (skeleton / mensaje de error / estado vacío) — no asume que el dataset siempre tiene filas.
-- Las tasas (`openRate`, `clickRate`, `bounceRate`, y desde 2026-07-09 también `hardBounceRate`/`softBounceRate`/`spamRate`/`unsubscribeRate`) se calculan en `dataService.js` desde conteos crudos, nunca desde las columnas de texto de tasa de HubSpot (ver sección 4) — cualquier componente/hook que las use ya las recibe correctas, no necesita re-validarlas.
+- **Ningún componente de UI agrega datos "a mano"** para los charts/tablas/insights — toda agregación (por fecha, por país, top N, insights avanzados, keywords, benchmarks, paginación) vive en `reportAggregations.js` / `advancedAnalytics.js` / `benchmarks.js` / `pagination.js`, funciones puras y testeables por separado.
+- `useAdvancedAnalytics` sigue el mismo contrato que `useHubspotData`: recibe el dataset como parámetro (no filtra, no hace fetch) y solo memoiza (`useMemo`) sobre las funciones puras — es un hook "de presentación de agregados", no una segunda fuente de verdad.
+- Los filtros (país / tipo de envío / tipo de comunicación / rango de fechas) y la navegación (`view`, `selectedCampaignId`) son **estado de `App.jsx`**, no de `useHubspotData` ni de `FiltersBar`/`DashboardLayout`/`CampaignsView` — estos solo reportan cambios vía callbacks, siguiendo el patrón "componente controlado".
+- Excepciones deliberadas de estado que NO sube a `App.jsx`: la granularidad del `LineChart` (Día/Semana/Mes, local a `ReportsView.jsx`) y, desde la Fase Enterprise, **`searchTerm`/`currentPage` de `CampaignsView.jsx`** — ninguno de los dos filtra `data` en el sentido de re-derivar `filteredData`, solo cambian cómo se agrupan/muestran los mismos puntos ya filtrados, así que no necesitan vivir "arriba" en el árbol ni persistirse entre vistas.
+- `useTheme` sigue el mismo patrón: expone `isDark`/`toggleTheme`, aplica la clase `dark` como efecto secundario sobre `document.documentElement`, y no persiste nada — cada carga de página vuelve a leer `prefers-color-scheme` (ver sección 5.2).
+- Todo componente que consume datos derivados acepta `loading` y `error` como props explícitas y maneja su propio estado visual — no asume que el dataset siempre tiene filas.
+- Las tasas (`openRate`, `clickRate`, `bounceRate`, `hardBounceRate`/`softBounceRate`/`spamRate`/`unsubscribeRate`) se calculan en `dataService.js` desde conteos crudos, nunca desde las columnas de texto de tasa de HubSpot (ver sección 4).
+
+## 5.2 DECISIÓN ARQUITECTÓNICA: PAGINACIÓN + `useMemo` EN VEZ DE `localStorage` (Fase Enterprise, 2026-07-09)
+
+David pidió explícitamente optimizar el dashboard para manejar miles de correos sin saturar la memoria del navegador, y fue explícito en que **no se debía usar `localStorage`** para la data cruda. Esto se tradujo en dos decisiones concretas:
+
+1. **Paginación en memoria, no `localStorage`.** `CampaignsView.jsx` nunca cachea filas en `localStorage` — `paginate()` (en `pagination.js`) simplemente recorta el array ya filtrado (`filteredRows.slice(...)`) a 15 elementos por página en cada render, apoyándose en `useMemo` para no repetir el corte si `filteredRows`/`currentPage` no cambiaron. El costo real (filtrar + ordenar 436 filas) es trivial incluso sin memoizar; la razón de fondo para paginar es **DOM**, no CPU: renderizar 436 `<tr>` a la vez es mucho más pesado para el navegador que renderizar 15, sin importar cuán rápido se calculen. `localStorage` no resuelve ese problema (sigue habiendo que renderizar todo), y además tiene un límite de ~5MB por origen que un dataset de miles de filas con 55 columnas podría alcanzar — por eso ni siquiera se evaluó como opción real.
+2. **`useMemo` para evitar recomputar, no para evitar re-fetchear.** El fetch del CSV ya ocurría una sola vez al montar (`useHubspotData`, decisión previa a esta fase); lo que sí faltaba era evitar que escribir en el buscador o cambiar de página **recalculara agregaciones pesadas** (agrupar por fecha, sumar por país, contar palabras clave) sobre el dataset completo en cada tecla. Se resolvió envolviendo esos cálculos en `useMemo` con las dependencias correctas (ver la lista de bugs corregidos en la sección "Hecho" de arriba), no guardando resultados precalculados en `localStorage` — cualquier cambio de filtro invalida el `useMemo` de forma predecible y automática, mientras que una caché en `localStorage` requeriría invalidación manual y se desincronizaría fácilmente del CSV en tiempo real.
+3. **Modo oscuro tampoco usa `localStorage`** (extensión conservadora del mismo criterio, documentada en el código de `useTheme.js`): aunque el flag `isDark` no es "data cruda" en el sentido estricto del pedido original, se prefirió mantener el mismo principio de "sin persistencia en el navegador" en toda la Fase Enterprise, en vez de introducir una excepción puntual. Costo: el tema vuelve a detectarse desde `prefers-color-scheme` en cada carga de página (no recuerda si el usuario tocó el toggle manualmente en la sesión anterior) — ver sección 3 "Falta" si se decide que esto debería cambiar.
+4. **`jspdf`/`html2canvas` se cargan con `import()` dinámico**, no como parte del bundle inicial — mismo espíritu de "no cargar peso que la mayoría de las sesiones no va a usar". Confirmado en el build: quedan en chunks separados (`jspdf.es.min-*.js` ~390 kB, `html2canvas.esm-*.js` ~201 kB) que **no** se descargan hasta que el usuario hace clic en "Exportar informe".
 
 ---
 
@@ -329,6 +365,33 @@ Detalle completo en `DESIGN_SYSTEM-LIVO.md`.
 | Estado "sin alertas" (verde) | `bg-[#DCFCE7] text-[#15803D]` | Reutiliza el mismo semantic-green ya usado en `MetricCard.jsx` para variación positiva |
 | `Tooltip.jsx` (fondo del globo) | `bg-[#111]` + `text-white` + `shadow-tooltip` | Neutral oscuro — patrón estándar de tooltip (no forma parte de la paleta de marca a propósito, igual que en la mayoría de sistemas de diseño); usa el token `shadow-tooltip` que ya existía en `tailwind.config.js` desde el scaffold inicial, pensado justamente para este caso |
 
+### 6.1.1 Mapeo de colores — Benchmarks y Modo oscuro (Fase Enterprise, 2026-07-09)
+
+**Semáforo de benchmarks (`BenchmarkDot` en `MetricCard.jsx`):** reutiliza los mismos semantic-colors ya establecidos en la sección 6.1 (alertas de Salud del dominio), no se inventaron colores nuevos:
+
+| Estado | Clase Tailwind | Semántica |
+|---|---|---|
+| `success` (≥ meta) | `bg-[#15803D]` (punto) | Mismo verde que "sin alertas" de Salud del dominio |
+| `warning` (≥ 75% de la meta) | `bg-[#CA8A04]` | Ámbar — nuevo tono puntual, semántica estándar de "advertencia" (no confundir con Orange de marca, que es para urgencia/CTA) |
+| `danger` (< 75% de la meta) | `bg-[#DC2626]` | Mismo rojo que las alertas de Salud del dominio |
+
+**Modo oscuro — paleta base (nueva, Fase Enterprise):** Tailwind `darkMode: "class"`; los siguientes tonos NO están en `DESIGN_SYSTEM-LIVO.md` (que solo define la paleta en modo claro) y se definieron ad-hoc siguiendo la lógica tonal del sistema existente (fondo app más oscuro que las cards, cards con borde sutil en vez de sombra):
+
+| Elemento | Modo claro | Modo oscuro |
+|---|---|---|
+| Fondo de la app (`shell`, `<main>`) | `bg-livo-gray` (`#F0F0F0`) | `#0B0B0F` |
+| Header | `bg-white` | `#15151B` |
+| Superficie de card | `bg-white` | `#1C1C24` |
+| Borde de card | `border-livo-gray` | `border-white/10` |
+| Sombra de card | `shadow-sm` | `shadow-none` (se usa el borde para separar, no sombra — las sombras no se ven bien sobre fondos oscuros) |
+| Texto primario | `text-black` | `text-white` |
+| Texto secundario | `text-[#666]` | `text-white/60` |
+| Texto de cuerpo | `text-[#111]` | `text-white/90` |
+| Texto muted/deshabilitado | `text-[#AAA]` | `text-white/40` |
+| Fondos sutiles (hover, filas alternas) | `bg-livo-gray/40`–`/70` | `bg-white/5`–`/10` |
+
+**Recharts (`ReportsView.jsx`) — no puede usar clases `dark:`** (renderiza SVG con props inline `stroke`/`fill`, no DOM+CSS), así que la paleta se resolvió con un objeto de colores hex separado por tema (`CHART_COLORS.light`/`.dark`), aplicado condicionalmente vía `isDark ? CHART_COLORS.dark : CHART_COLORS.light` a `CartesianGrid`, ejes, tooltip y leyenda. Los colores de las series (Electric Blue, Orange, Pink de la sección 6.1) no cambian entre temas — solo cambian grid/ejes/texto de soporte, que si se dejaban en sus tonos claros originales quedaban ilegibles sobre fondo oscuro.
+
 ### 6.2 Rebrand LIVO → Prisma (2026-07-09)
 
 Se cambió el nombre de marca visible en la UI de "LIVO" a **"Prisma"**, a pedido de David. Alcance del cambio — **solo texto/branding visible**, nada estructural:
@@ -370,6 +433,23 @@ Verificado en el navegador real: al filtrar por "Flujo de trabajo" la tabla de C
 | `FiltersBar.jsx` | Rediseñado (2026-07-09) | `headerActions` de Resumen/Campañas/Países | Deja de ser una tarjeta propia en `<main>`; ahora es una fila compacta sin wrapper, vive en el header |
 | `DateRangeFilter.jsx` | Modificado (2026-07-09) | Dentro de `FiltersBar.jsx` | Nuevos props `compact` (trigger `h-9`) y `align="right"` (popover no se desborda del viewport en el header) |
 
+### 6.5 Componentes de UI — mapeo Fase Enterprise (2026-07-09)
+
+| Componente | Tipo | Dónde se usa | Reemplaza / se agrega a |
+|---|---|---|---|
+| `SearchBar` (subcomponente interno) | Nuevo | Dentro de `CampaignsView.jsx` (no es archivo aparte) | Se agrega sobre la tabla de campañas |
+| `PaginationControls` (subcomponente interno) | Nuevo | Dentro de `CampaignsView.jsx` (no es archivo aparte) | Se agrega debajo de la tabla; sustituye el scroll interno (`max-h-[560px]`) que existía antes |
+| `BenchmarkDot` (subcomponente interno) | Nuevo | Dentro de `MetricCard.jsx` (no es archivo aparte) | Se agrega junto al título de la card, envuelto en `Tooltip` |
+| `KeywordPerformanceCard` | Nuevo | `AdvancedInsights.jsx` (vista "Resumen") | Se agrega como 4ta tarjeta; grid pasa de `lg:grid-cols-3` a `md:grid-cols-2 xl:grid-cols-4` |
+| `useTheme.js` | Nuevo (hook) | `App.jsx` → `DashboardLayout.jsx` / `ReportsView.jsx` | Se agrega — no reemplaza nada |
+| Toggle sol/luna (`SunIcon`/`MoonIcon`) | Nuevo | Sidebar de `DashboardLayout.jsx` (entre la navegación y el footer) | Se agrega |
+| Botón "Exportar informe" (`DownloadIcon`/`SpinnerIcon`) | Nuevo | Header de `DashboardLayout.jsx`, todas las vistas | Se agrega |
+| `MetricCard.jsx` | Modificado | `DashboardSummary.jsx` | Nuevo prop `benchmark`; sin cambios de comportamiento si no se pasa (retrocompatible) |
+| `CampaignsView.jsx` | Reescrito | Vista "Campañas" | Ya no renderiza las 436 filas de una vez; agrega búsqueda + paginación; se quitó el contenedor con scroll interno |
+| `ReportsView.jsx` | Modificado | Vista "Resumen" | Nuevo prop `isDark`; paleta de colores de Recharts pasó de hardcodeada a `CHART_COLORS.light`/`.dark` |
+| `DashboardLayout.jsx` | Modificado | Todas las vistas | Nuevos props `isDark`/`onToggleTheme`; nuevo `mainRef` + `handleExportPdf()`; fondo/bordes con variantes `dark:` |
+| 11 componentes de presentación | Retrofit de clases `dark:` | Toda la app | Bulk find/replace literal (130 reemplazos), ver sección "Hecho" para el detalle de archivos y 2 correcciones manuales |
+
 ---
 
 ## 7. ARCHIVOS DE REFERENCIA EN ESTA CARPETA
@@ -385,15 +465,17 @@ Verificado en el navegador real: al filtrar por "Flujo de trabajo" la tabla de C
 
 ## 8. PRÓXIMOS PASOS SUGERIDOS
 
-1. Revisar en el editor de columnas del reporte de HubSpot si se puede exportar la URL pública ("ver en el navegador") del correo — si existe, reemplazar la tarjeta de preview de `CampaignDetailView.jsx` por un iframe real de esa URL (sin login, ya confirmado que `info.lentesplus.com` no bloquea iframes). Ver sección 4 para el detalle completo de la investigación.
-2. Calcular `growth` real (variación vs. período anterior) para alimentar los badges de `DashboardSummary` — hoy el prop existe pero no hay lógica que lo produzca.
-3. Tests para `dataService.js`, `useHubspotData.js`, `reportAggregations.js` y `advancedAnalytics.js` (parseo, filtros, KPIs, agregaciones, insights avanzados).
-4. Agregar tooltips de valor absoluto (`Tooltip.jsx`) también en la tabla "Top 5 campañas" de `ReportsView.jsx`, por consistencia con Campañas/Países.
-5. Extraer `LoadingState` / `ErrorState` genéricos si el patrón inline actual (skeleton + mensaje de error por componente) se vuelve repetitivo al sumar más vistas.
-6. Retirar `Filters.jsx` (legacy) una vez se confirme que no hace falta en ninguna vista.
-7. Revisar tamaño de bundle (`build.rollupOptions.output.manualChunks` en `vite.config.js`) antes de desplegar a producción — sigue creciendo con cada feature (ahora ~611 kB).
-8. Deploy a Vercel (import del repo de GitHub, framework preset "Vite", sin variables de entorno necesarias por ahora).
-9. Verificar en viewport móvil real el nuevo header con `FiltersBar` (título + filtros en la misma fila, `flex-wrap`) — solo se validó en desktop en esta ronda; si el wrap se ve apretado, evaluar un patrón de filtros colapsables (ícono + drawer) para mobile.
+1. Abrir/inspeccionar manualmente un PDF exportado por el nuevo botón "Exportar informe" para confirmar que el corte entre páginas A4 no interrumpe una fila de tabla o un gráfico a la mitad.
+2. Verificar en viewport móvil real el nuevo header con `FiltersBar` (título + filtros en la misma fila, `flex-wrap`, ahora con 4 selects: país/tipo/comunicación/fecha) — solo se validó en desktop; si el wrap se ve apretado, evaluar un patrón de filtros colapsables (ícono + drawer) para mobile.
+3. Revisar en el editor de columnas del reporte de HubSpot si se puede exportar la URL pública ("ver en el navegador") del correo — si existe, reemplazar la tarjeta de preview de `CampaignDetailView.jsx` por un iframe real de esa URL. Ver sección 4 para el detalle completo de la investigación.
+4. Calcular `growth` real (variación vs. período anterior) para alimentar los badges de `DashboardSummary` — hoy el prop existe pero no hay lógica que lo produzca.
+5. Tests para `dataService.js`, `useHubspotData.js`, `reportAggregations.js`, `advancedAnalytics.js`, `benchmarks.js` y `pagination.js` (parseo, filtros, KPIs, agregaciones, insights avanzados, semáforo de benchmarks, corte de páginas).
+6. Agregar tooltips de valor absoluto (`Tooltip.jsx`) también en la tabla "Top 5 campañas" de `ReportsView.jsx`, por consistencia con Campañas/Países.
+7. Extraer `LoadingState` / `ErrorState` genéricos si el patrón inline actual (skeleton + mensaje de error por componente) se vuelve repetitivo al sumar más vistas.
+8. Retirar `Filters.jsx` (legacy) una vez se confirme que no hace falta en ninguna vista.
+9. Revisar tamaño de bundle principal (`build.rollupOptions.output.manualChunks` en `vite.config.js`) antes de desplegar a producción — jspdf/html2canvas ya están correctamente separados en chunks lazy, pero el chunk principal sigue creciendo con cada feature (ahora ~629 kB).
+10. Deploy a Vercel (import del repo de GitHub, framework preset "Vite", sin variables de entorno necesarias por ahora).
+11. Decidir si el toggle de modo oscuro debería persistir entre sesiones (hoy siempre vuelve a `prefers-color-scheme` del sistema al recargar, decisión explícita de no usar `localStorage` — ver sección 5.2, punto 3) — si David lo pide, la alternativa sin `localStorage` sería una cookie de sesión o simplemente aceptar el comportamiento actual como definitivo.
 
 ---
 
@@ -417,6 +499,24 @@ Otros comandos disponibles (`package.json`):
 | `npm run build` | Build de producción en `dist/` (ya validado sin errores) |
 | `npm run preview` | Sirve localmente el build de `dist/` para probarlo como en producción |
 
-Validado en este entorno el 2026-07-09 (última corrida, tras mover `FiltersBar` al header): `npm run build` — 850 módulos, `dist/assets/index-*.js` ~610.6 kB (~176.3 kB gzip), `dist/assets/index-*.css` ~19.6 kB (~4.6 kB gzip), sin errores (el warning de chunk >500 kB sigue siendo el único aviso, ver sección 8, ítem 7). Nota de sandbox: el build se corrió con `--outDir` temporal porque `dist/` en la carpeta del proyecto tenía protección de borrado del entorno — no afecta al build real del usuario, que corre `npm run build` normalmente y escribe en `dist/` sin problema.
+Validado en este entorno el 2026-07-09 (última corrida, tras mover `FiltersBar` al header): `npm run build` — 850 módulos, `dist/assets/index-*.js` ~610.6 kB (~176.3 kB gzip), `dist/assets/index-*.css` ~19.6 kB (~4.6 kB gzip), sin errores (el warning de chunk >500 kB sigue siendo el único aviso, ver sección 8). Nota de sandbox: el build se corrió con `--outDir` temporal porque `dist/` en la carpeta del proyecto tenía protección de borrado del entorno — no afecta al build real del usuario, que corre `npm run build` normalmente y escribe en `dist/` sin problema.
 
-Validado además en el navegador real del usuario (Chrome, macOS, vía Claude in Chrome) el mismo día: las 4 vistas del sidebar cargan datos reales y coherentes, la navegación entre ellas funciona correctamente, y específicamente para esta ronda: el toggle Día/Semana/Mes de la tendencia, el embudo de conversión y la tarjeta de preview sin iframe del detalle de campaña, los tooltips de valor absoluto en Campañas/Países, y las 3 tarjetas de analítica avanzada (Insight del asunto, Salud del dominio, Mejor horario de envío) en la vista Resumen — y, para el cambio de esta ronda, que el título quede a la izquierda y los filtros compactos a la derecha en la misma fila del header en Resumen/Campañas/Países, que el popover de `DateRangeFilter` (alineado a la derecha) no se salga del viewport, y que Configuración y el detalle de campaña muestren el header sin filtros.
+Validado además en el navegador real del usuario (Chrome, macOS, vía Claude in Chrome) el mismo día: las 4 vistas del sidebar cargan datos reales y coherentes, la navegación entre ellas funciona correctamente, y específicamente para esa ronda: el toggle Día/Semana/Mes de la tendencia, el embudo de conversión y la tarjeta de preview sin iframe del detalle de campaña, los tooltips de valor absoluto en Campañas/Países, y las 3 tarjetas de analítica avanzada en la vista Resumen; y que el título quede a la izquierda y los filtros compactos a la derecha en la misma fila del header en Resumen/Campañas/Países.
+
+---
+
+## 10. VALIDACIÓN DE BUILD Y NAVEGADOR — FASE ENTERPRISE (2026-07-09)
+
+`npm run build` (post `npm install jspdf html2canvas --save`): **1237 módulos**, sin errores. `jspdf`/`html2canvas` quedan correctamente separados en chunks lazy (`jspdf.es.min-*.js` ~390 kB, `html2canvas.esm-*.js` ~201 kB), **no** forman parte del bundle inicial — confirmado comparando el tamaño del chunk principal antes/después: `dist/assets/index-*.js` pasó de ~611 kB/176 kB gzip a ~629 kB/181 kB gzip (crecimiento explicado por el resto del código nuevo — filtro/benchmarks/keywords/paginación/dark mode — no por las 2 librerías nuevas, que van aparte).
+
+Verificado en el navegador real del usuario (Chrome, macOS, vía Claude in Chrome):
+
+- **Filtro "Tipo de comunicación"**: nuevo selector visible en el header junto a País/Tipo/Fecha.
+- **Benchmarks**: puntos verdes junto a "Tasa de apertura" (37.3% ≥ meta 20%) y "Tasa de clics" (4.8% ≥ meta 2%) en `DashboardSummary`, con tooltip al hover.
+- **Rendimiento por palabras clave**: 4ta tarjeta en "Resumen" con keywords reales extraídas del Asunto ("contact" 55, "pedido" 47, "hub" 31, "customer" 31, "personaliz..." 27).
+- **Buscador + paginación en Campañas**: búsqueda "liquidos" filtra a 19 resultados, "Página 1 de 2" (15 filas) / "Página 2 de 2" (4 filas), Anterior/Siguiente se deshabilitan en los bordes correctamente.
+- **Exportar informe (PDF)**: botón visible en el header de las 4 vistas, clic dispara estado de carga (spinner) y vuelve a idle sin error visible; import dinámico confirmado en el build (ver arriba). *(Pendiente: abrir el PDF descargado para inspección visual — ver sección 8, ítem 1.)*
+- **Modo oscuro**: toggle sol/luna en el sidebar, cambia el tema en toda la app (Resumen, Campañas con búsqueda/paginación activa, Países, Configuración, detalle de campaña), detecta correctamente `prefers-color-scheme: dark` del sistema al cargar, estado de filtros/búsqueda/página se preserva al alternar el tema. **Configuración y detalle de campaña re-verificados explícitamente en esta ronda** (no se habían chequeado en la primera pasada post-retrofit).
+- **Consola del navegador**: sin errores tras una navegación fresca (`read_console_messages`, `onlyErrors: true`) — el único error visto durante la sesión fue una entrada cacheada del bug de orden de Hooks ya corregido (`ReportsView.jsx`/`CountriesView.jsx`, ver sección "Hecho" arriba), no una recurrencia.
+
+Pendiente explícito de esta ronda de verificación: apertura manual del PDF descargado (ver sección 8) y chequeo del `<select>` nativo abierto en modo oscuro (cosmético, bajo riesgo — lo pinta el sistema operativo).

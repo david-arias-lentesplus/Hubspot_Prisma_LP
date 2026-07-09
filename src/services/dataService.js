@@ -91,6 +91,15 @@ const COLUMN_ALIASES = {
   previewText: ["Línea del asunto y clasificación del texto de vista previa", "Preview text"],
   hardBounceCount: ["Rebote duro", "Hard bounces"],
   softBounceCount: ["Rebote suave", "Soft bounces"],
+  // Campo añadido (2026-07-09, fase "Enterprise") para el filtro "Tipo de
+  // comunicación". Columna confirmada contra el CSV real en vivo (curl,
+  // 436 filas): "Clasificación del tipo de comunicación", con 6 valores
+  // distintos en inglés ("Promotional Offer" 163, "Account Management" 30,
+  // "Event Invitation or Reminder" 10, "Educational" 9, "Initial Engagement" 1,
+  // "Feedback" 1) y 222 filas vacías (mayormente AUTO/WORKFLOW sin
+  // clasificar — ver `COMMUNICATION_TYPE_OPTIONS` en `FiltersBar.jsx`, que
+  // mapea estos 6 valores + "Sin clasificar" para las vacías).
+  communicationType: ["Clasificación del tipo de comunicación", "Communication type classification"],
 };
 
 /**
@@ -269,6 +278,10 @@ function normalizeRow(rawRow) {
     previewText: pickField(rawRow, COLUMN_ALIASES.previewText) || "",
     senderName: pickField(rawRow, COLUMN_ALIASES.senderName) || "",
     senderAddress: pickField(rawRow, COLUMN_ALIASES.senderAddress) || "",
+    // "" (string vacío) para filas sin clasificar — nunca null/undefined,
+    // así el filtro "Sin clasificar" de FiltersBar.jsx puede comparar con
+    // `=== ""` de forma consistente.
+    communicationType: (pickField(rawRow, COLUMN_ALIASES.communicationType) || "").trim(),
     raw: rawRow, // se conserva la fila original por si se necesita depurar
   };
 }
