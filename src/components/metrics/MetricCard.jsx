@@ -37,7 +37,7 @@ export default function MetricCard({ titulo, valor, porcentajeCrecimiento }) {
   const isPositive = hasGrowth && porcentajeCrecimiento >= 0;
 
   return (
-    <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm">
+    <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm hover:shadow-md hover:border-livo-blue-200 transition-shadow duration-200">
       {/* Título — Poppins, texto secundario */}
       <p className="font-body text-sm text-[#666] mb-2">{titulo}</p>
 

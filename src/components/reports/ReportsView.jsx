@@ -1,0 +1,192 @@
+/**
+ * ReportsView.jsx
+ * ------------------------------------------------------------------
+ * Agente UI/UX + Agente de Datos — sección de reportes y gráficos del
+ * Dashboard. Se ubica debajo de `DashboardSummary`.
+ *
+ * Es un componente de presentación: toda la agregación de datos vive en
+ * `src/utils/reportAggregations.js` (funciones puras, Agente de Datos).
+ * Este componente solo llama a esas funciones sobre el dataset ya
+ * filtrado (país / rango de fechas) que le pasa el padre — típicamente
+ * el resultado de `filterByCountry` + `filterByDateRange` de
+ * `useHubspotData` — y renderiza:
+ *   1. LineChart:  Tasa de apertura vs. Tasa de clics en el tiempo
+ *   2. BarChart:   Enviados vs. Abiertos por país
+ *   3. Tabla:      Top 5 campañas por tasa de clics
+ *
+ * @requires recharts — ver handoff.md sección 5 (dependencias)
+ * ------------------------------------------------------------------
+ */
+
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { buildTrendSeries, buildCountryVolume, getTopCampaigns, COUNTRY_LABELS } from "../../utils/reportAggregations";
+
+function ChartCard({ title, children, className = "" }) {
+  return (
+    <div className={`bg-white rounded-card p-6 border border-livo-gray shadow-sm ${className}`}>
+      <h3 className="font-display font-bold text-lg text-black mb-4">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function EmptyState({ message }) {
+  return <div className="h-72 flex items-center justify-center text-sm text-[#AAA]">{message}</div>;
+}
+
+function formatDateTick(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-6">
+      <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm h-80 animate-pulse" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm h-80 animate-pulse" />
+        <div className="bg-white rounded-card p-6 border border-livo-gray shadow-sm h-80 animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * @param {object} props
+ * @param {Array<object>} [props.data] - dataset ya filtrado (país/fecha), proveniente de `useHubspotData`
+ * @param {boolean} [props.loading]
+ * @param {string|null} [props.error]
+ */
+export default function ReportsView({ data = [], loading = false, error = null }) {
+  if (error) {
+    return (
+      <div className="bg-[#FFF5F5] border border-[#DC2626]/30 rounded-card p-6 text-sm text-[#B91C1C]">
+        No se pudieron cargar los reportes: {error}
+      </div>
+    );
+  }
+
+  if (loading) return <LoadingSkeleton />;
+
+  const trendSeries = buildTrendSeries(data);
+  const countryVolume = buildCountryVolume(data);
+  const topCampaigns = getTopCampaigns(data, 5);
+
+  return (
+    <div className="grid grid-cols-1 gap-6">
+      {/* --- 1. Tendencia en el tiempo --- */}
+      <ChartCard title="Tendencia de apertura y clics">
+        {trendSeries.length === 0 ? (
+          <EmptyState message="No hay datos suficientes para graficar la tendencia." />
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={trendSeries} margin={{ top: 4, right: 12, left: -8, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" />
+              <XAxis dataKey="date" tickFormatter={formatDateTick} tick={{ fontSize: 12, fill: "#666" }} />
+              <YAxis tick={{ fontSize: 12, fill: "#666" }} unit="%" />
+              <Tooltip labelFormatter={formatDateTick} formatter={(value) => [`${value}%`]} />
+              <Legend wrapperStyle={{ fontSize: 13 }} />
+              <Line
+                type="monotone"
+                dataKey="Tasa de apertura"
+                stroke="#0000E1"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 5 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="Tasa de clics"
+                stroke="#FC4F00"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* --- 2. Rendimiento por país --- */}
+        <ChartCard title="Enviados vs. abiertos por país">
+          {countryVolume.length === 0 ? (
+            <EmptyState message="No hay datos suficientes para este país/rango." />
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={countryVolume} margin={{ top: 4, right: 12, left: -8, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" />
+                <XAxis
+                  dataKey="country"
+                  tickFormatter={(code) => code}
+                  tick={{ fontSize: 12, fill: "#666" }}
+                />
+                <YAxis tick={{ fontSize: 12, fill: "#666" }} />
+                <Tooltip labelFormatter={(code) => COUNTRY_LABELS[code] || code} />
+                <Legend wrapperStyle={{ fontSize: 13 }} />
+                <Bar dataKey="Enviados" fill="#0000E1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Abiertos" fill="#D92D8E" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        {/* --- 3. Top 5 campañas por tasa de clics --- */}
+        <ChartCard title="Top 5 campañas por tasa de clics">
+          {topCampaigns.length === 0 ? (
+            <EmptyState message="No hay campañas para mostrar." />
+          ) : (
+            <div className="overflow-x-auto -mx-2">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-bold text-[#666] tracking-[0.5px] border-b border-livo-gray">
+                    <th className="px-2 py-2">Campaña</th>
+                    <th className="px-2 py-2">País</th>
+                    <th className="px-2 py-2 text-right">Apertura</th>
+                    <th className="px-2 py-2 text-right">Clics</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topCampaigns.map((row, i) => (
+                    <tr
+                      key={`${row.campaignName}-${i}`}
+                      className="border-b border-livo-gray last:border-0 hover:bg-livo-gray/50 transition-colors"
+                    >
+                      <td
+                        className="px-2 py-3 font-body text-[#111] truncate max-w-[220px]"
+                        title={row.campaignName}
+                      >
+                        {row.campaignName}
+                      </td>
+                      <td className="px-2 py-3">
+                        <span className="inline-flex items-center px-[10px] py-[2px] rounded-badge text-xs font-bold bg-[#E8E8FF] border border-livo-blue-600 text-livo-blue-600">
+                          {row.country}
+                        </span>
+                      </td>
+                      <td className="px-2 py-3 text-right font-mono text-[#666]">{row.openRate.toFixed(1)}%</td>
+                      <td className="px-2 py-3 text-right font-mono font-bold text-black">
+                        {row.clickRate.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </ChartCard>
+      </div>
+    </div>
+  );
+}

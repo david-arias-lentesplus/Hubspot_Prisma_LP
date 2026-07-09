@@ -1,6 +1,13 @@
 /**
  * Filters.jsx
  * ------------------------------------------------------------------
+ * ⚠️ LEGACY (2026-07-09): sustituido por `FiltersBar.jsx` en este mismo
+ * directorio, que cubre el mismo caso de uso como "barra superior"
+ * dentro del área principal (país + rango de fechas con presets).
+ * Se conserva por ahora sin cambios funcionales; usar `FiltersBar.jsx`
+ * en cualquier vista nueva. Ver handoff.md → "Siguientes pasos" para
+ * el retiro definitivo de este archivo.
+ * ------------------------------------------------------------------
  * Agente UI/UX Frontend — barra de filtros del Dashboard de HubSpot.
  *
  * Componente puro de presentación: no filtra datos por sí mismo.

@@ -87,10 +87,15 @@ export default function DashboardLayout({
     <div className="min-h-screen flex bg-livo-gray font-body">
       {/* ---------- Sidebar ---------- */}
       <aside className="w-64 shrink-0 bg-black text-white flex flex-col">
-        <div className="h-16 flex items-center px-6 border-b border-white/10">
-          <span className="font-display font-extrabold text-lg tracking-[0.5px]">
-            HubSpot <span className="text-livo-lime-500">Dashboard</span>
+        <div className="h-16 flex items-center gap-2.5 px-6 border-b border-white/10">
+          {/* Logo ficticio LIVO / Lentesplus */}
+          <span className="flex items-center justify-center w-8 h-8 shrink-0 rounded-card bg-livo-lime-500 text-black font-display font-extrabold text-sm">
+            L
           </span>
+          <div className="leading-tight">
+            <p className="font-display font-extrabold text-base tracking-[0.5px]">LIVO</p>
+            <p className="font-body text-[10px] text-white/50 -mt-0.5">Lentesplus · HubSpot</p>
+          </div>
         </div>
 
         <nav className="flex-1 px-3 py-6 space-y-1">
