@@ -6,9 +6,10 @@
  *
  * DECISIÓN DE ARQUITECTURA — SIN localStorage (ver handoff.md sección
  * 3/8 para el detalle completo): la preferencia de tema NO se persiste
- * entre recargas. Cada carga de la página arranca según la preferencia
- * del sistema operativo del usuario (`prefers-color-scheme`), y el
- * toggle del sidebar solo cambia el estado en memoria para la sesión
+ * entre recargas. Cada carga de la página arranca en **modo claro por
+ * defecto** (pedido explícito de David, 2026-07-09 — se dejó de seguir
+ * `prefers-color-scheme` del sistema operativo como estado inicial), y
+ * el toggle del sidebar solo cambia el estado en memoria para la sesión
  * actual. Esto es intencional — David pidió explícitamente no usar
  * `localStorage` en esta fase (ligado al objetivo de mantener la app
  * liviana con miles de correos, evitando cachear cualquier estado en
@@ -36,9 +37,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+// Modo claro por defecto (2026-07-09) — ya NO se consulta
+// `prefers-color-scheme` del sistema operativo como estado inicial.
+// El usuario puede seguir alternando a oscuro con el toggle del
+// sidebar; ese cambio vive en memoria para la sesión (ver comentario
+// de cabecera — sin localStorage).
 function getInitialIsDark() {
-  if (typeof window === "undefined" || !window.matchMedia) return false;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return false;
 }
 
 export function useTheme() {

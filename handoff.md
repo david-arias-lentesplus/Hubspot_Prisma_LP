@@ -213,6 +213,13 @@ Pedido explícito de David: el sidebar dependía de la altura del contenido en v
 - [x] Resultado: header, sidebar completo (nav + toggle de tema + footer) y el botón "Exportar informe" quedan siempre visibles y fijos; solo el contenido de `<main>` scrollea de forma independiente.
 - [x] Verificado en navegador real (Claude in Chrome): en la vista "Resumen" (la más larga, con las 4 tarjetas de analítica avanzada), al scrollear el contenido el sidebar y el header permanecen completamente fijos en su lugar; consola sin errores.
 
+**Modo claro por defecto (2026-07-09):**
+
+Pedido explícito de David: que el dashboard arranque siempre en modo claro, en vez de seguir `prefers-color-scheme` del sistema operativo del usuario.
+
+- [x] `src/hooks/useTheme.js` — `getInitialIsDark()` ya no consulta `window.matchMedia("(prefers-color-scheme: dark)")`; ahora devuelve `false` de forma fija. El toggle sol/luna del sidebar sigue funcionando igual (cambia `isDark` en memoria para la sesión actual); sigue sin usar `localStorage` (mismo criterio de la sección 5.2 — el estado de tema no se persiste entre recargas, cada carga vuelve a arrancar en claro).
+- [x] Verificado en navegador real: recarga completa de la app abre en modo claro sin importar el tema del sistema operativo.
+
 ### Falta
 
 - [ ] Estados visuales `LoadingState` / `ErrorState` genéricos y reutilizables (hoy cada componente nuevo implementa su propio skeleton/error inline; conviene extraerlos)

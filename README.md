@@ -44,7 +44,7 @@ Abrir `http://localhost:5173`. El dashboard hace fetch del CSV en tiempo real, a
 - Vista "Campañas" (`CampaignsView.jsx`): **buscador por Asunto/Nombre + paginación de 15 filas por página (nuevo, Fase Enterprise)** — evita renderizar las 436 filas de golpe; filas clickeables que abren `CampaignDetailView.jsx` con embudo de conversión, análisis comparativo vs. pares y tarjeta de preview sin iframe
 - Vista "Países" (`CountriesView.jsx`): tarjetas + tabla comparativa por país, con tooltips de valor absoluto en cada porcentaje
 - Vista "Configuración" (`SettingsView.jsx`): panel 100% informativo — nombre de la hoja de cálculo origen, URLs (deshabilitadas) + botón "Refrescar datos"
-- **Modo oscuro (nuevo, Fase Enterprise)**: `useTheme.js` (hook) + Tailwind `darkMode: "class"`, toggle sol/luna en el sidebar, detecta `prefers-color-scheme` al cargar, **sin `localStorage`** (decisión explícita — ver `handoff.md` sección 5.2)
+- **Modo oscuro (Fase Enterprise)**: `useTheme.js` (hook) + Tailwind `darkMode: "class"`, toggle sol/luna en el sidebar. **Arranca siempre en modo claro por defecto** (2026-07-09, ya no sigue `prefers-color-scheme` del sistema), **sin `localStorage`** (decisión explícita — ver `handoff.md` sección 5.2), así que el toggle manual dura solo la sesión actual
 - `Tooltip.jsx` (`components/common/`): tooltip nativo con Tailwind puro (`group`/`group-hover`, sin librería)
 - `reportAggregations.js`: agregaciones puras + `filterCampaignsBySearch` (nuevo, Fase Enterprise)
 - `pagination.js` (nuevo, Fase Enterprise): `paginate()` en memoria, sin `localStorage`
