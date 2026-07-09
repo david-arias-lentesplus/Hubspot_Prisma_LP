@@ -184,10 +184,21 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen flex bg-livo-gray dark:bg-[#0B0B0F] font-body">
-      {/* ---------- Sidebar ---------- */}
-      <aside className="w-64 shrink-0 bg-black text-white flex flex-col">
-        <div className="h-16 flex items-center gap-2.5 px-6 border-b border-white/10">
+    <div className="h-screen flex bg-livo-gray dark:bg-[#0B0B0F] font-body overflow-hidden">
+      {/* ---------- Sidebar ----------
+          FIJO AL VIEWPORT (2026-07-09): el shell pasó de `min-h-screen` a
+          `h-screen overflow-hidden`, así que este `<aside>` (hijo directo,
+          `align-items: stretch` por defecto) siempre ocupa exactamente el
+          alto de pantalla, nunca más. Antes, con `min-h-screen`, el shell
+          crecía junto con el contenido de `<main>` y arrastraba al sidebar
+          con él, obligando a scrollear la página completa para ver el
+          nav/el toggle de tema en secciones largas. Ahora solo `<main>`
+          scrollea (ver `overflow-y-auto` más abajo); si el listado de
+          `navItems` llegara a no entrar en la altura disponible, `<nav>`
+          scrollea de forma independiente (`overflow-y-auto` propio) sin
+          tapar el logo de arriba ni el footer/toggle de abajo. */}
+      <aside className="w-64 shrink-0 h-full bg-black text-white flex flex-col">
+        <div className="h-16 shrink-0 flex items-center gap-2.5 px-6 border-b border-white/10">
           {/* Logo ficticio Prisma / Lentesplus */}
           <span className="flex items-center justify-center w-8 h-8 shrink-0 rounded-card bg-livo-lime-500 text-black font-display font-extrabold text-sm">
             P
@@ -198,7 +209,7 @@ export default function DashboardLayout({
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-6 space-y-1">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-6 space-y-1">
           {navItems.map((item) => {
             const isActive = item.id === activeId;
             return (
@@ -229,7 +240,7 @@ export default function DashboardLayout({
         </nav>
 
         {/* Toggle de modo oscuro (2026-07-09) — estado en memoria, ver useTheme.js */}
-        <div className="px-3 pb-3">
+        <div className="shrink-0 px-3 pb-3">
           <button
             type="button"
             onClick={onToggleTheme}
@@ -242,14 +253,19 @@ export default function DashboardLayout({
           </button>
         </div>
 
-        <div className="px-6 py-4 border-t border-white/10 text-xs text-white/50">
+        <div className="shrink-0 px-6 py-4 border-t border-white/10 text-xs text-white/50">
           Lentesplus SAS · Prisma
         </div>
       </aside>
 
-      {/* ---------- Área principal ---------- */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="min-h-16 bg-white dark:bg-[#15151B] border-b border-livo-gray dark:border-white/10 flex items-center justify-between flex-wrap gap-x-4 gap-y-2 px-8 py-2.5 shrink-0">
+      {/* ---------- Área principal ----------
+          `min-h-0` es necesario acá (gotcha clásico de Flexbox): sin esto,
+          este contenedor no se deja "encoger" por debajo del alto de su
+          contenido, y el `overflow-y-auto` de `<main>` de abajo nunca
+          entraría en efecto — el scroll se iría de nuevo a la página
+          completa en vez de quedarse dentro de `<main>`. */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        <header className="min-h-16 shrink-0 bg-white dark:bg-[#15151B] border-b border-livo-gray dark:border-white/10 flex items-center justify-between flex-wrap gap-x-4 gap-y-2 px-8 py-2.5">
           <h1 className="font-display font-bold text-2xl text-black dark:text-white shrink-0">{title}</h1>
           <div className="flex items-center gap-2 flex-wrap justify-end ml-auto">
             {headerActions}
