@@ -40,8 +40,23 @@ import Papa from "papaparse";
 // directamente — habría que meter un proxy server-side (p. ej. función
 // serverless en Vercel) que descargue el archivo del lado del servidor
 // (sin CORS ni cuota por IP de usuario final) y se lo sirva al frontend.
+//
+// ACTUALIZACIÓN 2026-07-15 — `gid` cambió al actualizar los datos del CSV:
+// tras cargar datos nuevos en la hoja, la publicación con `gid=0` empezó a
+// responder 400 ("No se pudo abrir el archivo en este momento"). Causa:
+// Google le asignó un `gid` interno nuevo a la pestaña al recrearla/
+// reordenarla, aunque el nombre visible de la pestaña no cambió — esto
+// invalida cualquier link "Publicar en la web" que ya apuntaba al `gid`
+// viejo. Se republicó la hoja desde Sheets y David compartió el nuevo
+// link (`gid=137777016`), verificado con `curl` antes de aplicarlo acá:
+// 200 OK, `content-type: text/csv`, 11,102 filas / 79 columnas (antes:
+// 436 filas). Si esto vuelve a pasar tras una futura actualización de
+// datos, repetir el mismo diagnóstico: `curl -sIL <URL>` — un 400 con
+// "No se pudo abrir el archivo" (a diferencia de un CORS/network error)
+// significa que el `gid` publicado ya no es válido y hay que republicar
+// desde Google Sheets (Archivo → Compartir → Publicar en la web).
 export const HUBSPOT_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVMjhgnoi0H2fH9GLFgD-3f1VyIEC_EKeixdOZDpc0OeVaY0WWqSeojUdTUoVzdh_07W0OATyvSP2J/pub?gid=0&single=true&output=csv";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVMjhgnoi0H2fH9GLFgD-3f1VyIEC_EKeixdOZDpc0OeVaY0WWqSeojUdTUoVzdh_07W0OATyvSP2J/pub?gid=137777016&single=true&output=csv";
 
 // Prefijos de país reconocidos en el nombre de campaña (ej. "MKT_MX_Verano2026")
 const COUNTRY_PREFIXES = ["MX", "CO", "CL", "AR"];
